@@ -1,0 +1,168 @@
+use avian3d::prelude::*;
+use std::time::Duration;
+use bevy::{
+    animation::RepeatAnimation,
+    prelude::*,
+};
+
+use crate::components::Protagonist;
+use crate::resources::{Animations, SCENES};
+
+pub fn handle_climbing(
+    mut collision_started: EventReader<CollisionStarted>,
+    mut collision_ended: EventReader<CollisionEnded>,
+    mut protagonist_query: Query<&mut Protagonist>,
+    name_query: Query<&Name>,
+    time: Res<Time>,
+) {
+    // Handle collision start events
+    for collision in collision_started.read() {
+        // Check if one entity is the protagonist and the other is the ladder sensor
+        if let Ok(mut protagonist) = protagonist_query.get_mut(collision.0) {
+            if name_query.get(collision.1).map_or(false, |name| name.as_str() == "LadderSensor") {
+                // Only set climbing if we haven't just toggled it
+                if !protagonist.was_climbing {
+                    protagonist.is_climbing = true;
+                    protagonist.was_climbing = false;
+                    protagonist.is_falling = false;
+                    println!("Started climbing: Protagonist entered ladder sensor zone");
+                }
+            }
+        } else if let Ok(mut protagonist) = protagonist_query.get_mut(collision.1) {
+            if name_query.get(collision.0).map_or(false, |name| name.as_str() == "LadderSensor") {
+                if !protagonist.was_climbing {
+                    protagonist.is_climbing = true;
+                    protagonist.was_climbing = false;
+                    protagonist.is_falling = false;
+                    println!("Started climbing: Protagonist entered ladder sensor zone");
+                }
+            }
+        }
+    }
+
+    // Handle collision end events
+    for collision in collision_ended.read() {
+        // Reset climbing state when leaving the ladder sensor
+        if let Ok(mut protagonist) = protagonist_query.get_mut(collision.0) {
+            if name_query.get(collision.1).map_or(false, |name| name.as_str() == "LadderSensor") {
+                protagonist.is_climbing = false;
+                println!("Stopped climbing: Protagonist left ladder sensor zone");
+            }
+        } else if let Ok(mut protagonist) = protagonist_query.get_mut(collision.1) {
+            if name_query.get(collision.0).map_or(false, |name| name.as_str() == "LadderSensor") {
+                protagonist.is_climbing = false;
+                println!("Stopped climbing: Protagonist left ladder sensor zone");
+            }
+        }
+    }
+}
+
+pub fn climbing_keyboard_control(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut impulse_query: Query<&mut ExternalImpulse, With<Protagonist>>,
+    mut protagonist_query: Query<(&Transform, &mut Protagonist)>,
+    mut velocity_query: Query<(&mut LinearVelocity, &mut AngularVelocity), With<Protagonist>>,
+    mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
+    mut camera_query: Query<&mut Transform, (With<Camera>, Without<Protagonist>)>,
+    animations: Res<Animations>,
+    time: Res<Time>,
+) {
+    let (protagonist_transform, mut protagonist) = match protagonist_query.get_single_mut() {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+
+    if protagonist.is_climbing {
+        protagonist.is_falling = false;
+
+        // Calculate movement speeds
+        let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { 2.0 } 
+                        else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 }
+                        else { 0.0 };
+        
+        let side_speed = if keyboard_input.pressed(KeyCode::KeyQ) { 2.0 }
+                        else if keyboard_input.pressed(KeyCode::KeyE) { -2.0 }
+                        else { 0.0 };
+
+        // Update velocity with both vertical and horizontal movement and damp rotation
+        for (mut linear_velocity, mut angular_velocity) in velocity_query.iter_mut() {
+            linear_velocity.0 = Vec3::new(0.0, climb_speed * 2.5, side_speed * 2.5);
+            angular_velocity.0 = Vec3::ZERO; // Reset rotational velocity while climbing
+        }
+
+        for (mut player, mut transitions) in &mut animation_players {
+            if protagonist.is_climbing {
+                let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { 2.0 } 
+                                else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 }
+                                else { 0.0 };
+                
+                if let Some(climb) = SCENES.get("CLIMB") {
+                    let anim_handle = animations.animations[*climb];
+                    if climb_speed != 0.0 {
+                        // Resume or start animation when moving
+                        if !player.is_playing_animation(anim_handle) {
+                            transitions
+                                .play(
+                                    &mut player,
+                                    anim_handle,
+                                    Duration::from_millis(250),
+                                )
+                                .set_speed(climb_speed)
+                                .set_repeat(RepeatAnimation::Forever);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Handle camera rotation while climbing
+    if let Ok(mut camera_transform) = camera_query.get_single_mut() {
+        let rotation_speed = 2.0;
+        
+        if keyboard_input.pressed(KeyCode::KeyA) || keyboard_input.pressed(KeyCode::KeyD) {
+            let rotation = Quat::from_rotation_y(
+                if keyboard_input.pressed(KeyCode::KeyA) { rotation_speed } 
+                else { -rotation_speed } 
+                * time.delta_seconds()
+            );
+            
+            // Remove the distance multiplier
+            let relative_pos = camera_transform.translation - protagonist_transform.translation;
+            
+            let rotated_pos = rotation * relative_pos;
+            camera_transform.translation = protagonist_transform.translation + rotated_pos;
+            camera_transform.look_at(protagonist_transform.translation, Vec3::Y);
+        }
+    }
+}
+
+pub fn check_ladder_presence(
+    mut protagonist_query: Query<(&Transform, &mut Protagonist)>,
+    spatial_query: SpatialQuery,
+) {
+    for (transform, mut protagonist) in protagonist_query.iter_mut() {
+        if protagonist.is_climbing {
+            // Cast a ray forward from the protagonist
+            let ray_pos = transform.translation;
+            let ray_dir = transform.forward(); // Using the forward direction
+            let max_distance = 1.0; // Adjust this value based on your needs
+            let filter = SpatialQueryFilter::default();
+
+            let hits = spatial_query.ray_hits(
+                ray_pos,
+                ray_dir,
+                max_distance,
+                1,
+                true,
+                filter
+            );
+
+            // If there's nothing in front, stop climbing
+            if hits.is_empty() {
+                protagonist.is_climbing = false;
+                protagonist.was_climbing = true; // Prevent immediate re-entry
+            }
+        }
+    }
+}
