@@ -58,6 +58,9 @@ pub fn teleport_system(
         Some((pos, "Wall"))
     } else if keyboard.just_pressed(KeyCode::Digit7) {
         Some((AIRLOCK_POSITION, "Airlock"))
+    } else if keyboard.just_pressed(KeyCode::Digit8) {
+        let pos = Vec3::new(-455.44263, 3.0, 914.4542);
+        Some((pos, "North Area"))
     } else {
         None
     };
@@ -70,39 +73,3 @@ pub fn teleport_system(
     }
 }
 
-pub fn teleport_to_location(location: &str) -> Vec3 {
-    match location {
-        "geothermal" => Vec3::new(
-            GEOTHERMAL_POSITION.x,
-            GEOTHERMAL_POSITION.y + GEOTHERMAL_BASE_HEIGHT + 1.0,
-            GEOTHERMAL_POSITION.z,
-        ),
-        "radio_tower" => Vec3::new(
-            RADIO_TOWER_POSITION.x + RADIO_TOWER_WIDTH / 2.0,
-            RADIO_TOWER_POSITION.y + RADIO_TOWER_HEIGHT + 1.0,
-            RADIO_TOWER_POSITION.z + RADIO_TOWER_WIDTH / 2.0
-        ),
-        "bridge" => Vec3::new(
-            BRIDGE_POSITION.x,
-            BRIDGE_POSITION.y + BRIDGE_HEIGHT + 1.0,
-            BRIDGE_POSITION.z + BRIDGE_WIDTH / 2.0
-        ),
-        "tram" => Vec3::new(
-            TRAM_POSITION.x,
-            TRAM_POSITION.y + 1.0,
-            TRAM_POSITION.z
-        ),
-        "ladder_top" => Vec3::new(
-            LADDER_START.x,
-            LADDER_START.y + WALL_HEIGHT + 1.0,
-            LADDER_START.z + LADDER_WIDTH / 2.0
-        ),
-        "airlock" => Vec3::new(
-            AIRLOCK_POSITION.x - 20.0,
-            AIRLOCK_POSITION.y + 10.0,
-            AIRLOCK_POSITION.z - 20.0
-        ),
-        // ... other teleport locations ...
-        _ => Vec3::ZERO,
-    }
-}

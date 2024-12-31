@@ -18,6 +18,7 @@ use systems::input::keyboard_animation_control;
 use systems::falling;
 use systems::timer::{setup_debug_timer, print_protagonist_transform};
 use systems::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
+use systems::minimap::{setup_minimap, update_minimap};
 use avian3d::prelude::*;
 use bevy::{
     animation::animate_targets,
@@ -59,6 +60,8 @@ fn main() {
         ))
         .add_systems(Startup, setup_debug_timer)
         .add_systems(Update, print_protagonist_transform)
+        .add_systems(Startup, setup_minimap)
+        .add_systems(Update, update_minimap)
         .run();
 }
 
