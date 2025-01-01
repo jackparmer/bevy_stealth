@@ -74,25 +74,29 @@ pub fn climbing_keyboard_control(
     if protagonist.is_climbing {
         protagonist.is_falling = false;
 
-        // Calculate movement speeds
-        let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { 2.0 } 
-                        else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 }
+        // Add speed multiplier based on shift key
+        let speed_multiplier = if keyboard_input.pressed(KeyCode::ShiftLeft) || 
+                                keyboard_input.pressed(KeyCode::ShiftRight) { 2.0 } else { 1.0 };
+
+        // Calculate movement speeds with multiplier
+        let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { 2.0 * speed_multiplier } 
+                        else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 * speed_multiplier }
                         else { 0.0 };
         
-        let side_speed = if keyboard_input.pressed(KeyCode::KeyQ) { 2.0 }
-                        else if keyboard_input.pressed(KeyCode::KeyE) { -2.0 }
+        let side_speed = if keyboard_input.pressed(KeyCode::KeyQ) { 2.0 * speed_multiplier }
+                        else if keyboard_input.pressed(KeyCode::KeyE) { -2.0 * speed_multiplier }
                         else { 0.0 };
 
-        // Update velocity with both vertical and horizontal movement and damp rotation
+        // Update velocity with multiplied speeds
         for (mut linear_velocity, mut angular_velocity) in velocity_query.iter_mut() {
             linear_velocity.0 = Vec3::new(0.0, climb_speed * 2.5, side_speed * 2.5);
-            angular_velocity.0 = Vec3::ZERO; // Reset rotational velocity while climbing
+            angular_velocity.0 = Vec3::ZERO;
         }
 
         for (mut player, mut transitions) in &mut animation_players {
             if protagonist.is_climbing {
-                let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { 2.0 } 
-                                else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 }
+                let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { 2.0 * speed_multiplier } 
+                                else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 * speed_multiplier }
                                 else { 0.0 };
                 
                 if let Some(climb) = SCENES.get("CLIMB") {
@@ -142,10 +146,10 @@ pub fn check_ladder_presence(
 ) {
     for (transform, mut protagonist) in protagonist_query.iter_mut() {
         if protagonist.is_climbing {
-            // Cast a ray forward from the protagonist
+            // Cast a shorter ray forward from the protagonist
             let ray_pos = transform.translation;
-            let ray_dir = transform.forward(); // Using the forward direction
-            let max_distance = 1.0; // Adjust this value based on your needs
+            let ray_dir = transform.forward();
+            let max_distance = 0.5; // Reduced from 1.0 to make it easier to exit
             let filter = SpatialQueryFilter::default();
 
             let hits = spatial_query.ray_hits(
@@ -160,7 +164,7 @@ pub fn check_ladder_presence(
             // If there's nothing in front, stop climbing
             if hits.is_empty() {
                 protagonist.is_climbing = false;
-                protagonist.was_climbing = true; // Prevent immediate re-entry
+                protagonist.was_climbing = true;
             }
         }
     }

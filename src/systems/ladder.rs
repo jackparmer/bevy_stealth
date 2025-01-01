@@ -89,10 +89,10 @@ pub fn spawn_ladder(
                         half_height: LADDER_WIDTH/2.0,
                     }),
                     material: materials.add(StandardMaterial {
-                        base_color: Color::srgb(0.5, 0.0, 0.0),
+                        base_color: Color::srgb(0.7, 0.7, 0.7),
                         perceptual_roughness: 0.9,
-                        metallic: 0.5,
-                        emissive: Color::srgb(0.4, 0.0, 0.0).into(),
+                        metallic: 0.8,
+                        emissive: Color::srgb(0.2, 0.2, 0.3).into(),
                         ..default()
                     }),
                     transform: Transform::from_translation(Vec3::new(

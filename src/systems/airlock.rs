@@ -132,16 +132,16 @@ pub fn spawn_airlock(
     let offset = -AIRLOCK_LENGTH/2.0;  // Only interior spotlight
     let x = offset * 1.2;
     let z = 0.0;
-    let spotlight_position = AIRLOCK_POSITION + Vec3::new(x, AIRLOCK_RADIUS * 0.6, z);
+    let spotlight_position = AIRLOCK_POSITION + Vec3::new(x, AIRLOCK_RADIUS * 0.4, z);
 
     // Spawn the spotlight
     commands.spawn(SpotLightBundle {
         spot_light: SpotLight {
             color: Color::srgb(1.0, 0.5, 0.1),
-            intensity: 100000000.0,
-            range: AIRLOCK_RADIUS * 30.0,
-            outer_angle: 1.2,
-            inner_angle: 0.6,
+            intensity: 500000000.0,
+            range: AIRLOCK_RADIUS * 50.0,
+            outer_angle: 1.6,
+            inner_angle: 0.8,
             shadows_enabled: true,
             ..default()
         },
