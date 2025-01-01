@@ -42,7 +42,6 @@ pub fn spawn_terrain(
     
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
-    let mut normals = Vec::new();
     let mut uvs = Vec::new();
     
     let mut vertex_map = vec![vec![-1i32; TERRAIN_RESOLUTION as usize + 1]; TERRAIN_RESOLUTION as usize + 1];
@@ -99,7 +98,7 @@ pub fn spawn_terrain(
     }
     
     // Calculate normals
-    normals = vec![[0.0, 1.0, 0.0]; vertices.len()];
+    let mut normals = vec![[0.0, 1.0, 0.0]; vertices.len()];
     for chunk in indices.chunks(3) {
         if let [i1, i2, i3] = chunk {
             let v1 = Vec3::from(vertices[*i1 as usize]);
@@ -178,7 +177,7 @@ pub fn toggle_terrain_texture(
         }
     }
 
-    if let Ok((protagonist_transform, protagonist)) = protagonist_query.get_single() {
+    if let Ok((_protagonist_transform, protagonist)) = protagonist_query.get_single() {
         let should_be_icy = protagonist.is_swimming;
 
         for (mut terrain, material_handle) in terrain_query.iter_mut() {

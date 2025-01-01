@@ -13,7 +13,7 @@ pub fn handle_climbing(
     mut collision_ended: EventReader<CollisionEnded>,
     mut protagonist_query: Query<&mut Protagonist>,
     name_query: Query<&Name>,
-    time: Res<Time>,
+    _time: Res<Time>,
 ) {
     // Handle collision start events
     for collision in collision_started.read() {
@@ -59,7 +59,6 @@ pub fn handle_climbing(
 
 pub fn climbing_keyboard_control(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut impulse_query: Query<&mut ExternalImpulse, With<Protagonist>>,
     mut protagonist_query: Query<(&Transform, &mut Protagonist)>,
     mut velocity_query: Query<(&mut LinearVelocity, &mut AngularVelocity), With<Protagonist>>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,

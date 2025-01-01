@@ -2,6 +2,7 @@ use crate::components::Protagonist;
 use crate::resources::Animations;
 use crate::systems::portal::{TopPortalSensor, BottomPortalSensor};
 use crate::systems::ladder::{spawn_ladder, LadderConfig};
+use crate::systems::warehouse::spawn_warehouse;
 
 use avian3d::prelude::*;
 use bevy::{
@@ -40,7 +41,6 @@ pub const WORLD_RADIUS: f32 = 1500.0;
 
 pub const TOWER_LADDER_START: Vec3 = Vec3::new(214.0, 100.0, 200.0);
 pub const ACQUIFER_LADDER_START: Vec3 = Vec3::new(50.0, 245.0, 50.0);
-
 
 struct ProtagonistStart {
     position: Vec3,
@@ -106,7 +106,7 @@ pub fn setup(
 
     // Add Ambient Light
     commands.insert_resource(AmbientLight {
-        color: Color::rgb(0.2, 0.2, 0.3),
+        color: Color::srgb(0.2, 0.2, 0.3),
         brightness: 600.0,
     });
 
@@ -134,16 +134,12 @@ pub fn setup(
 
     // Static "floor"
 
-    
-    let floor_depth_scale = 0.9;
-    let max_floor_layer_count = 50.0;
     let floor_material = materials.add(StandardMaterial {
         perceptual_roughness: 0.9,
         metallic: 0.1,
         base_color_texture: Some(asset_server.load("textures/8k_mars.png")),
         ..default()
     });
-
 
     commands.spawn((
         RigidBody::Static,
@@ -534,54 +530,6 @@ pub fn setup(
         Name::new("AcquifierFloor"),
     ));    
 
-    // Random generator
-    let mut rng = rand::thread_rng();
-
-    // Metal shipping containers
-    let metal_texture_handle = asset_server.load("textures/container_metal.png");
-
-    // Create a material with the stars texture
-    let metal_material = materials.add(StandardMaterial {
-        base_color_texture: Some(metal_texture_handle),
-        metallic: 1.0,
-        ..default()
-    });
-
-    /*
-    // Add random metal containers
-    for _ in 0..50 {
-        let random_position = Vec3::new(
-            rng.gen_range(-300.0..300.0),
-            rng.gen_range(0.0..50.0),
-            rng.gen_range(-300.0..300.0),
-        );
-
-        // Ensure the position isn't near the protagonist's start
-        if random_position.distance(Vec3::new(0.0, 1.0, 0.0)) > 50.0 {
-            commands.spawn((
-                RigidBody::Dynamic,
-                Collider::cuboid(8.0, 3.0, 3.0),
-                PbrBundle {
-                    mesh: meshes.add(Cuboid::new(8.0, 3.0, 3.0)),
-                    material: materials.add(StandardMaterial {
-                        base_color_texture: Some(asset_server.load("textures/container_metal.png")),
-                        metallic: 1.0,
-                        ..default()
-                    }),
-                    transform: Transform::from_translation(random_position)
-                        .with_rotation(Quat::from_euler(
-                            EulerRot::XYZ,
-                            rng.gen_range(0.0..std::f32::consts::PI),
-                            rng.gen_range(0.0..std::f32::consts::PI),
-                            rng.gen_range(0.0..std::f32::consts::PI),
-                        )),
-                    ..default()
-                },
-            ));
-        }
-    }
-    */
-
     // Add invisible floor
     commands.spawn((
         RigidBody::Static,
@@ -659,4 +607,6 @@ pub fn setup(
             rung_count: 200,
         },
     );    
+
+    spawn_warehouse(&mut commands, &mut meshes, &mut materials, &asset_server);
 }

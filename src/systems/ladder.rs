@@ -44,7 +44,7 @@ pub fn spawn_ladder(
                 base_color_texture: Some(asset_server.load("textures/ice_texture3.png")),
                 perceptual_roughness: 0.3,
                 metallic: 0.8,
-                base_color: Color::rgb(0.3, 0.3, 0.3),
+                base_color: Color::srgb(0.3, 0.3, 0.3),
                 ..default()
             }),
             transform: Transform::from_translation(
@@ -66,7 +66,7 @@ pub fn spawn_ladder(
                         base_color_texture: Some(asset_server.load("textures/ice_texture3.png")),
                         perceptual_roughness: 0.3,
                         metallic: 0.8,
-                        base_color: Color::rgb(0.3, 0.3, 0.3),
+                        base_color: Color::srgb(0.3, 0.3, 0.3),
                         ..default()
                     }),
                     transform: Transform::from_translation(Vec3::new(
@@ -89,10 +89,10 @@ pub fn spawn_ladder(
                         half_height: LADDER_WIDTH/2.0,
                     }),
                     material: materials.add(StandardMaterial {
-                        base_color: Color::rgb(0.5, 0.0, 0.0),
+                        base_color: Color::srgb(0.5, 0.0, 0.0),
                         perceptual_roughness: 0.9,
                         metallic: 0.5,
-                        emissive: Color::rgb(0.4, 0.0, 0.0).into(),
+                        emissive: Color::srgb(0.4, 0.0, 0.0).into(),
                         ..default()
                     }),
                     transform: Transform::from_translation(Vec3::new(
@@ -121,7 +121,7 @@ pub fn spawn_ladder(
                     config.height,
                     LADDER_WIDTH)),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::rgba(0.1, 0.0, 0.0, 0.1),
+                    base_color: Color::srgba(0.1, 0.0, 0.0, 0.1),
                     alpha_mode: AlphaMode::Blend,
                     ..default()
                 }),

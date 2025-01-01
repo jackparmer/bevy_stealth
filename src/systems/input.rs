@@ -23,11 +23,11 @@ pub fn keyboard_animation_control(
 ) {
     let turn_speed = 3.0; // Fixed rotation speed (radians per second)
     let move_speed = 5.0; // Units per second
-    let run_speed = 20.0; // Running speed (doubled from 10.0)
+    let run_speed = 30.0; // Running speed (doubled from 10.0)
     let strafe_speed = 4.0; // Strafing speed
-    let underwater_speed = 8.0; // Underwater movement speed
+    let underwater_speed = 30.0; // Underwater movement speed
 
-    if let Ok((mut protagonist_transform, mut protagonist)) = protagonist_query.get_single_mut() {
+    if let Ok((mut protagonist_transform, protagonist)) = protagonist_query.get_single_mut() {
         // Extract only Y rotation and force upright orientation
         let (yaw, _, _) = protagonist_transform.rotation.to_euler(EulerRot::YXZ);
         protagonist_transform.rotation = Quat::from_rotation_y(yaw);
@@ -181,7 +181,7 @@ pub fn keyboard_animation_control(
                         
                         if let Some(strafe) = SCENES.get(strafe_anim) {
                             if !player.is_playing_animation(animations.animations[*strafe]) {
-                                let animation = transitions
+                                let _animation = transitions
                                     .play(
                                         &mut player,
                                         animations.animations[*strafe],
@@ -210,7 +210,7 @@ pub fn keyboard_animation_control(
                         
                         if let Some(strafe) = SCENES.get(strafe_anim) {
                             if !player.is_playing_animation(animations.animations[*strafe]) {
-                                let animation = transitions
+                                let _animation = transitions
                                     .play(
                                         &mut player,
                                         animations.animations[*strafe],

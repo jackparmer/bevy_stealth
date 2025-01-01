@@ -4,8 +4,9 @@ use avian3d::prelude::*;
 use crate::components::Protagonist;
 
 pub const AIRLOCK_RADIUS: f32 = 16.0;
-pub const AIRLOCK_LENGTH: f32 = 80.0;
+pub const AIRLOCK_LENGTH: f32 = 100.0;
 pub const AIRLOCK_POSITION: Vec3 = Vec3::new(865.24176, 2.6249726, -424.97363);
+pub const AIRLOCK_TELEPORT_OFFSET: f32 = 20.0;
 
 #[derive(Component)]
 pub struct AirlockLight {
@@ -34,7 +35,7 @@ pub fn spawn_airlock(
                 half_height: AIRLOCK_LENGTH/2.0,
             }),
             material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/container_metal.png")),
+                base_color_texture: Some(asset_server.load("textures/rusty_metal_grid_diff_4k.png")),
                 perceptual_roughness: 0.8,
                 metallic: 0.7,
                 ..default()
@@ -52,7 +53,7 @@ pub fn spawn_airlock(
             PbrBundle {
                 mesh: meshes.add(Sphere::default()),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::rgb(0.8, 0.0, 0.0),
+                    base_color: Color::srgb(0.8, 0.0, 0.0),
                     emissive: LinearRgba::new(5.0, 0.0, 0.0, 1.0),  // Much higher intensity
                     ..default()
                 }),
@@ -61,7 +62,7 @@ pub fn spawn_airlock(
                 ..default()
             },
             PointLight {
-                color: Color::rgb(1.0, 0.0, 0.0),
+                color: Color::srgb(1.0, 0.0, 0.0),
                 intensity: 0.0,  // Will be toggled in the blink system
                 range: AIRLOCK_RADIUS * 200.0,
                 ..default()
@@ -75,23 +76,23 @@ pub fn spawn_airlock(
 
     // Add metallic doors at both ends
     for offset in [-AIRLOCK_LENGTH/2.0, AIRLOCK_LENGTH/2.0] {
+        let door_height = AIRLOCK_RADIUS * 0.6;  // half-height of the door
         commands.spawn((
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(
-                    AIRLOCK_RADIUS * 0.2,  // width (halved)
-                    AIRLOCK_RADIUS * 0.6,  // height (halved)
-                    0.5,                   // depth (thickness)
+                    AIRLOCK_RADIUS * 0.05,     // thickness (halved)
+                    door_height,               // height (halved)
+                    AIRLOCK_RADIUS * 0.6,      // width (halved)
                 )),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::rgb(0.3, 0.0, 0.0), // Dark red
+                    base_color_texture: Some(asset_server.load("textures/airlock_door.png")),
                     metallic: 1.0,
-                    perceptual_roughness: 0.2, // Fairly smooth/shiny
+                    perceptual_roughness: 0.2,
+                    emissive: Color::srgb(0.1, 0.0, 0.0).into(), 
                     ..default()
                 }),
-                transform: Transform::from_translation(AIRLOCK_POSITION + Vec3::new(offset, 0.0, 0.0))
-                    .with_rotation(
-                        Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)
-                    ),
+                transform: Transform::from_translation(AIRLOCK_POSITION + Vec3::new(offset, door_height/2.0, 0.0))  // Changed to door_height/2.0
+                    .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
                 ..default()
             },
             Name::new("AirlockDoor"),
@@ -112,7 +113,7 @@ pub fn spawn_airlock(
                     half_height: 1.1,
                 }),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::rgba(1.0, 0.0, 0.0, 0.01),
+                    base_color: Color::srgba(1.0, 0.0, 0.0, 0.01),
                     alpha_mode: AlphaMode::Blend,
                     ..default()
                 }),
@@ -127,49 +128,50 @@ pub fn spawn_airlock(
         ));
     }
 
-    /*
-    for offset in [-AIRLOCK_LENGTH/2.0, AIRLOCK_LENGTH/2.0] {
-        commands.spawn((
-            RigidBody::Static,
-            Collider::cylinder(0.1, AIRLOCK_RADIUS),
-            PbrBundle {
-                mesh: meshes.add(Cylinder {
-                    radius: AIRLOCK_RADIUS,
-                    half_height: 0.1,
-                }),
-                material: materials.add(StandardMaterial {
-                    base_color_texture: Some(asset_server.load("textures/container_metal.png")),
-                    perceptual_roughness: 0.8,
-                    metallic: 0.7,
-                    ..default()
-                }),
-                transform: Transform::from_translation(
-                    AIRLOCK_POSITION + Vec3::new(offset, 0.0, 0.0)
-                ),
-                ..default()
-            },
-            Name::new("AirlockCap"),
-        ));
-    }
-    */
+    // Add spotlights at both ends - Adjusting position and intensity
+    let offset = -AIRLOCK_LENGTH/2.0;  // Only interior spotlight
+    let x = offset * 1.2;
+    let z = 0.0;
+    let spotlight_position = AIRLOCK_POSITION + Vec3::new(x, AIRLOCK_RADIUS * 0.6, z);
+
+    // Spawn the spotlight
+    commands.spawn(SpotLightBundle {
+        spot_light: SpotLight {
+            color: Color::srgb(1.0, 0.5, 0.1),
+            intensity: 100000000.0,
+            range: AIRLOCK_RADIUS * 30.0,
+            outer_angle: 1.2,
+            inner_angle: 0.6,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_translation(spotlight_position)
+            .looking_to(Vec3::Y, -Vec3::new(x, 0.0, z).normalize()),
+        ..default()
+    });
 }
 
 pub fn blink_airlock_light(
     time: Res<Time>,
-    mut lights: Query<(&mut AirlockLight, &mut Handle<StandardMaterial>, &mut PointLight)>,
+    mut lights: Query<(&mut AirlockLight, Option<&mut Handle<StandardMaterial>>, Option<&mut PointLight>)>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for (mut light, material_handle, mut point_light) in &mut lights {
         light.timer.tick(time.delta());
         if light.timer.just_finished() {
-            if let Some(material) = materials.get_mut(&*material_handle) {
-                let is_on = material.emissive.red > 0.0;
-                material.emissive = if is_on {
-                    LinearRgba::new(0.0, 0.0, 0.0, 1.0)
-                } else {
-                    LinearRgba::new(5.0, 0.0, 0.0, 1.0)  // Much higher intensity when lit
-                };
-                point_light.intensity = if is_on { 0.0 } else { 1000.0 };
+            if let Some(material_handle) = material_handle {
+                if let Some(material) = materials.get_mut(&*material_handle) {
+                    let is_on = material.emissive.red > 0.0;
+                    material.emissive = if is_on {
+                        LinearRgba::new(0.0, 0.0, 0.0, 1.0)
+                    } else {
+                        LinearRgba::new(5.0, 0.0, 0.0, 1.0)
+                    };
+                    
+                    if let Some(point_light) = &mut point_light {
+                        point_light.intensity = if is_on { 0.0 } else { 1000.0 };
+                    }
+                }
             }
         }
     }
@@ -205,9 +207,9 @@ fn teleport_player(
 ) {
     // Calculate the target x position relative to the airlock
     let target_x = if is_entry {
-        AIRLOCK_POSITION.x + AIRLOCK_LENGTH/2.0 + 6.0
+        AIRLOCK_POSITION.x + AIRLOCK_LENGTH/2.0 + AIRLOCK_TELEPORT_OFFSET
     } else {
-        AIRLOCK_POSITION.x - AIRLOCK_LENGTH/2.0 - 6.0
+        AIRLOCK_POSITION.x - AIRLOCK_LENGTH/2.0 - AIRLOCK_TELEPORT_OFFSET
     };
 
     // Keep current y and z, only update x

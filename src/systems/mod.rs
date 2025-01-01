@@ -13,3 +13,4 @@ pub mod teleports;
 pub mod airlock;
 pub mod ladder;
 pub mod minimap;
+pub mod warehouse;

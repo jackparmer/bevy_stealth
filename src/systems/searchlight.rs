@@ -37,7 +37,7 @@ pub fn underwater_searchlight_system(
             commands.spawn((
                 DirectionalLightBundle {
                     directional_light: DirectionalLight {
-                        color: Color::rgb(0.24, 0.62, 0.92),
+                        color: Color::srgb(0.24, 0.62, 0.92),
                         illuminance: 25000.0,
                         shadows_enabled: true,
                         ..default()

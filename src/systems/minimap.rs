@@ -3,7 +3,6 @@ use bevy::{
     render::camera::Viewport,
 };
 use crate::components::Protagonist;
-use std::f32::consts::*;
 
 // Add marker component for minimap elements
 #[derive(Component)]
@@ -32,13 +31,13 @@ pub fn setup_minimap(
                 ..default()
             },
             transform: Transform::from_xyz(0.0, MINIMAP_CAMERA_HEIGHT, 0.0)
-                .looking_at(Vec3::ZERO, Vec3::Z),
+                .looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         },
         MinimapCamera,
     ));
 
-    // Spawn red dot for protagonist
+    // Spawn red dot for protagonist with neutral initial rotation
     commands.spawn((
         PbrBundle {
             mesh: meshes.add(Mesh::from(Sphere {
@@ -46,12 +45,11 @@ pub fn setup_minimap(
                 ..default()
             })),
             material: materials.add(StandardMaterial {
-                base_color: Color::rgb(1.0, 0.0, 0.0),
+                base_color: Color::srgb(1.0, 0.0, 0.0),
                 emissive: Color::srgba(1.0, 0.0, 0.0, 0.5).into(),
                 ..default()
             }),
-            transform: Transform::from_xyz(0.0, 500.0, 0.0)
-                .with_rotation(Quat::from_rotation_y(-PI / 2.0)),
+            transform: Transform::from_xyz(0.0, 500.0, 0.0),
             ..default()
         },
         MinimapMarker,
@@ -67,26 +65,22 @@ pub fn update_minimap(
     )>,
 ) {
     if let Ok(player_transform) = protagonist_query.get_single() {
-        // Update camera position
+        // Update camera position but keep static rotation
         for mut camera_transform in param_set.p0().iter_mut() {
             camera_transform.translation = Vec3::new(
                 player_transform.translation.x,
                 MINIMAP_CAMERA_HEIGHT,
                 player_transform.translation.z
             );
-            // Set a fixed downward-looking rotation instead of using look_at
-            camera_transform.rotation = Quat::from_rotation_x(-PI / 2.0);
         }
 
-        // Update marker position and rotation
+        // Update marker position and rotation to show player direction
         for mut marker_transform in param_set.p1().iter_mut() {
-            if marker_transform.scale.x < 10.0 { // Only move the dot, not the background plane
-                marker_transform.translation.x = player_transform.translation.x;
-                marker_transform.translation.z = player_transform.translation.z;
-                // Copy the Y-rotation from the player to the marker
-                let player_y_rot = player_transform.rotation.to_euler(EulerRot::XYZ).1;
-                marker_transform.rotation = Quat::from_rotation_x(-PI / 2.0) * Quat::from_rotation_y(player_y_rot);
-            }
+            marker_transform.translation = Vec3::new(
+                player_transform.translation.x,
+                500.0,
+                player_transform.translation.z
+            );
         }
     }
 }

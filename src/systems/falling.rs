@@ -11,7 +11,7 @@ pub fn check_falling(
     mut gizmos: Gizmos,
     mut ambient_light: ResMut<AmbientLight>,
 ) {
-    for (entity, mut protagonist, transform, velocity) in protagonist_query.iter_mut() {
+    for (entity, mut protagonist, transform, _velocity) in protagonist_query.iter_mut() {
         // Don't set falling state if swimming or climbing
         if protagonist.is_swimming || protagonist.is_climbing {
             protagonist.is_falling = false;
@@ -62,19 +62,19 @@ pub fn check_falling(
         // Draw the ray
         let ray_end = ray_pos + (ray_dir.as_vec3() * max_distance);
         if is_grounded {
-            gizmos.line(ray_pos, ray_end, Color::rgb(0.0, 1.0, 0.0));  // Green
+            gizmos.line(ray_pos, ray_end, Color::srgb(0.0, 1.0, 0.0));  // Green
             
             // Draw hit point if there is one
             if let Some(hit) = hits.first() {
                 let hit_point = ray_pos + (ray_dir.as_vec3() * hit.time_of_impact);
-                gizmos.sphere(hit_point, Quat::IDENTITY, 0.1, Color::rgb(1.0, 1.0, 0.0));  // Yellow
+                gizmos.sphere(hit_point, Quat::IDENTITY, 0.1, Color::srgb(1.0, 1.0, 0.0));  // Yellow
                 
                 // Draw normal at hit point
                 let normal_end = hit_point + (hit.normal * 0.3);
-                gizmos.line(hit_point, normal_end, Color::rgb(0.0, 0.0, 1.0));  // Blue
+                gizmos.line(hit_point, normal_end, Color::srgb(0.0, 0.0, 1.0));  // Blue
             }
         } else {
-            gizmos.line(ray_pos, ray_end, Color::rgb(1.0, 0.0, 0.0));  // Red
+            gizmos.line(ray_pos, ray_end, Color::srgb(1.0, 0.0, 0.0));  // Red
         }
     }
 }
@@ -82,7 +82,7 @@ pub fn check_falling(
 pub fn handle_falling_animation(
     protagonist_query: Query<(&Protagonist, &Children)>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
-    mut velocity_query: Query<&mut LinearVelocity>,
+    _velocity_query: Query<&mut LinearVelocity>,
     animations: Res<Animations>,
 ) {
     for (protagonist, _) in protagonist_query.iter() {
