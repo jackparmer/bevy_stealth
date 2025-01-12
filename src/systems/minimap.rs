@@ -12,6 +12,10 @@ pub struct MinimapMarker;
 pub struct MinimapCamera;
 
 const MINIMAP_CAMERA_HEIGHT: f32 = 1000.0;
+const MINIMAP_SMOOTHING_SPEED: f32 = 5.0;
+const MINIMAP_POSITION_PRECISION: f32 = 100.0; // For rounding
+const MINIMAP_MARKER_HEIGHT: f32 = 200.0; // Half of MINIMAP_CAMERA_HEIGHT
+const MINIMAP_MARKER_SIZE: f32 = 3.0;
 
 pub fn setup_minimap(
     mut commands: Commands, 
@@ -41,7 +45,7 @@ pub fn setup_minimap(
     commands.spawn((
         PbrBundle {
             mesh: meshes.add(Mesh::from(Sphere {
-                radius: 5.0,
+                radius: MINIMAP_MARKER_SIZE,
                 ..default()
             })),
             material: materials.add(StandardMaterial {
@@ -49,7 +53,7 @@ pub fn setup_minimap(
                 emissive: Color::srgba(1.0, 0.0, 0.0, 0.5).into(),
                 ..default()
             }),
-            transform: Transform::from_xyz(0.0, 500.0, 0.0),
+            transform: Transform::from_xyz(0.0, MINIMAP_MARKER_HEIGHT, 0.0),
             ..default()
         },
         MinimapMarker,
@@ -63,23 +67,34 @@ pub fn update_minimap(
         Query<&mut Transform, (With<MinimapCamera>, Without<Protagonist>, Without<MinimapMarker>)>,
         Query<&mut Transform, (With<MinimapMarker>, Without<MinimapCamera>, Without<Protagonist>)>,
     )>,
+    time: Res<Time>,
 ) {
     if let Ok(player_transform) = protagonist_query.get_single() {
-        // Update camera position but keep static rotation
+        // Update camera position with smoothing
         for mut camera_transform in param_set.p0().iter_mut() {
-            camera_transform.translation = Vec3::new(
-                player_transform.translation.x,
-                MINIMAP_CAMERA_HEIGHT,
-                player_transform.translation.z
+            let target_pos = Vec3::new(
+                (player_transform.translation.x * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
+                (player_transform.translation.y + MINIMAP_CAMERA_HEIGHT).round(),
+                (player_transform.translation.z * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
+            );
+            
+            camera_transform.translation = camera_transform.translation.lerp(
+                target_pos,
+                time.delta_seconds() * MINIMAP_SMOOTHING_SPEED,
             );
         }
 
-        // Update marker position and rotation to show player direction
+        // Update marker position with the same smoothing
         for mut marker_transform in param_set.p1().iter_mut() {
-            marker_transform.translation = Vec3::new(
-                player_transform.translation.x,
-                500.0,
-                player_transform.translation.z
+            let target_pos = Vec3::new(
+                (player_transform.translation.x * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
+                (player_transform.translation.y + MINIMAP_MARKER_HEIGHT).round(),
+                (player_transform.translation.z * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
+            );
+            
+            marker_transform.translation = marker_transform.translation.lerp(
+                target_pos,
+                time.delta_seconds() * MINIMAP_SMOOTHING_SPEED,
             );
         }
     }
