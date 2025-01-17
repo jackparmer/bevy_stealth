@@ -14,3 +14,4 @@ pub mod airlock;
 pub mod ladder;
 pub mod minimap;
 pub mod warehouse;
+pub mod driving;

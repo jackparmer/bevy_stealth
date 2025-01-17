@@ -11,6 +11,7 @@ use systems::terrain::{spawn_terrain, toggle_terrain_texture};
 use systems::airlock::{spawn_airlock, handle_airlock_teleport, blink_airlock_light};
 use systems::climbing::{handle_climbing, climbing_keyboard_control, check_ladder_presence};
 use systems::swimming::swimming_system;
+use systems::driving::{toggle_driving, driving_control};
 use systems::teleports::teleport_system;
 use systems::tram::move_tram;
 use systems::camera::rotate_camera;
@@ -40,6 +41,8 @@ fn main() {
         .add_systems(Update, handle_airlock_teleport)
         .add_systems(Update, blink_airlock_light)
         .add_systems(Update, toggle_terrain_texture)
+        .add_systems(Update, toggle_driving)
+        .add_systems(Update, driving_control)
         .add_systems(Update, move_tram)
         .add_systems(Update, animate_light_direction)
         .add_systems(Update, rotate_camera)

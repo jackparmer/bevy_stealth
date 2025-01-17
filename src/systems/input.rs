@@ -20,7 +20,10 @@ pub fn keyboard_animation_control(
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animations: Res<Animations>,
     mut current_animation: Local<usize>,
+    mut commands: Commands,
+    time: Res<Time>,
 ) {
+
     let turn_speed = 3.0; // Fixed rotation speed (radians per second)
     let move_speed = 5.0; // Units per second
     let run_speed = 30.0; // Running speed (doubled from 10.0)
@@ -28,13 +31,19 @@ pub fn keyboard_animation_control(
     let underwater_speed = 30.0; // Underwater movement speed
 
     if let Ok((mut protagonist_transform, protagonist)) = protagonist_query.get_single_mut() {
+
         // Extract only Y rotation and force upright orientation
         let (yaw, _, _) = protagonist_transform.rotation.to_euler(EulerRot::YXZ);
         protagonist_transform.rotation = Quat::from_rotation_y(yaw);
 
+        // Handle animations separately
         for (mut player, mut transitions) in &mut animation_players {
-            // Skip if climbing (now handled by other system)
-            if protagonist.is_climbing || protagonist.was_climbing {
+            if protagonist.is_driving {
+                continue; // Skip animation handling when driving
+            }
+
+            // Skip if climbing or driving
+            if protagonist.is_climbing || protagonist.was_climbing || protagonist.is_driving {
                 continue;
             }
 
@@ -171,6 +180,27 @@ pub fn keyboard_animation_control(
             } else {
                 // Handle normal movement
                 if !protagonist.is_swimming && !protagonist.is_falling {
+                    // Handle movement speed based on driving state
+                    let movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
+                        run_speed
+                    } else {
+                        move_speed
+                    };
+
+                    // Apply movement without animations if driving
+                    if protagonist.is_driving {
+                        if keyboard_input.pressed(KeyCode::KeyW) {
+                            for mut linear_velocity in velocity_query.iter_mut() {
+                                linear_velocity.0 = protagonist_transform.forward() * movement_speed;
+                            }
+                        } else if keyboard_input.pressed(KeyCode::KeyS) {
+                            for mut linear_velocity in velocity_query.iter_mut() {
+                                linear_velocity.0 = -protagonist_transform.forward() * movement_speed;
+                            }
+                        }
+                        continue; // Skip animation handling when driving
+                    }
+
                     // Handle strafing
                     if keyboard_input.pressed(KeyCode::KeyE) {
                         let strafe_anim = if keyboard_input.pressed(KeyCode::ShiftLeft) {

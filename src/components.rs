@@ -5,8 +5,9 @@ pub struct Protagonist {
     pub is_falling: bool,
     pub is_climbing: bool,
     pub was_climbing: bool,
-    pub is_swimming: bool,    // Add this field
-    pub was_swimming: bool,   // Add this field
+    pub is_swimming: bool,
+    pub was_swimming: bool,
+    pub is_driving: bool,
 }
 
 impl Default for Protagonist {
@@ -17,6 +18,7 @@ impl Default for Protagonist {
             was_climbing: false,
             is_swimming: false,
             was_swimming: false,
+            is_driving: false,
         }
     }
 }

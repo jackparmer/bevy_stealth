@@ -73,7 +73,7 @@ pub fn setup(
     let animations = graph
         .add_clips(
             (0..=PROTAGONIST_ANIMATIONS)
-                .map(|i| GltfAssetLabel::Animation(i).from_asset("models/ProtagonistLowPoly/Protagonist.glb"))
+                .map(|i| GltfAssetLabel::Animation(i).from_asset("models/Protagonist.glb"))
                 .map(|path| asset_server.load(path)), // Map to load the asset
             1.0,
             graph.root,
@@ -391,11 +391,12 @@ pub fn setup(
             is_falling: false,
             is_swimming: false,
             was_swimming: false,
+            is_driving: false,
         },
         SceneBundle {       
             scene: asset_server
                 .load(GltfAssetLabel::Scene(0)
-                .from_asset("models/ProtagonistLowPoly/Protagonist.glb")),
+                .from_asset("models/Protagonist.glb")),
             transform: Transform::from_translation(PROTAGONIST_START.position),
             ..default()
         },        

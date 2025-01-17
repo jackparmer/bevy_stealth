@@ -18,6 +18,11 @@ pub fn check_falling(
             continue;
         }
 
+        // Skip falling state update if driving, but continue with ground check
+        if protagonist.is_driving {
+            protagonist.is_falling = false;
+        }
+
         // Add overhead raycast
         let overhead_ray_pos = transform.translation;
         let overhead_ray_dir = Dir3::Y;
@@ -86,7 +91,8 @@ pub fn handle_falling_animation(
     animations: Res<Animations>,
 ) {
     for (protagonist, _) in protagonist_query.iter() {
-        if protagonist.is_falling {
+        // Skip falling animation if driving
+        if protagonist.is_falling && !protagonist.is_driving {
             for (mut player, mut transitions) in animation_players.iter_mut() {
                 if let Some(fly) = SCENES.get("FLY") {
                     if !player.is_playing_animation(animations.animations[*fly]) {

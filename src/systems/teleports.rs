@@ -21,6 +21,8 @@ use crate::systems::ladder::{
 const AIRLOCK_POSITION: Vec3 = Vec3::new(779.1837, 2.6249955, -423.27768);
 const GAME_START: Vec3 = Vec3::new(165.00298, 2.6249952, -150.00085);
 
+const OUTSIDE: Vec3 = Vec3::new(1102.4198, 2.6249733, -456.37585);
+
 use crate::components::Protagonist;
 
 pub fn teleport_system(
@@ -58,6 +60,8 @@ pub fn teleport_system(
             WALL_Y_POSITION + WALL_HEIGHT / 2.0, 
             0.0);
         Some((pos, "Wall"))
+    } else if keyboard.just_pressed(KeyCode::Digit9) {
+        Some((OUTSIDE, "Outside"))
     } else {
         None
     };
