@@ -7,18 +7,18 @@ use bevy::render::mesh::Indices;
 use bevy::pbr::{StandardMaterial, NotShadowCaster};
 use fastrand;
 
-pub fn spawn_warehouse(
+pub fn spawn_ice_cave(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     asset_server: &Res<AssetServer>,
 ) {
     let sphere_pos = Vec3::new(-455.0, 1.6, 915.0);
-    let radius = 100.0;
+    let radius = 400.0;
     let segments = 256; // Resolution of the sphere
-    let noise_scale = 4.0; 
-    let noise_amplitude = 40.0; 
-    let opening_size = 0.1; // Size of the hole (0.0 to 1.0)
+    let noise_scale = 8.0; 
+    let noise_amplitude = 200.0; 
+    let opening_size = 0.5; // Size of the hole (0.0 to 1.0)
 
     let perlin = Perlin::new(42); // Seed of 42
 
@@ -132,7 +132,7 @@ pub fn spawn_warehouse(
     ));
 
     // Parameters for the cube layer
-    let cube_size = 8.0;
+    let cube_size = 80.0;
 
     // Generate vertices for cube positions (but don't create the sphere mesh)
     let mut vertices: Vec<Vec3> = Vec::new();
@@ -184,6 +184,7 @@ pub fn spawn_warehouse(
             0.1 + fastrand::f32() * 0.2,     // low saturation: 0.1-0.3
             0.8 + fastrand::f32() * 0.2,     // high lightness: 0.8-1.0
         );
+        let emissive_strength = fastrand::f32() * 0.15; // Random emissive strength between 0 and 0.15
 
         let texture_path = if fastrand::f32() < 0.5 {
             "textures/snow_01_diff_4k.png"
@@ -202,6 +203,7 @@ pub fn spawn_warehouse(
                 metallic: 0.1,
                 perceptual_roughness: 0.7,
                 reflectance: 0.3,
+                emissive: Color::srgb(0.0, emissive_strength, emissive_strength * 2.0).into(),
                 base_color_texture: Some(asset_server.load(texture_path)),
                 uv_transform: if fastrand::bool() { 
                     StandardMaterial::FLIP_HORIZONTAL 
@@ -221,7 +223,7 @@ pub fn spawn_warehouse(
     // Add ring of spotlights around interior perimeter with water basins
     let num_lights = 1;
     let ring_radius = 70.0;
-    let light_height = 1.0;  // Moved lower to point upward
+    let light_height = 1.0;
     
     for i in 0..num_lights {
         let angle = (i as f32 / num_lights as f32) * 2.0 * PI;
@@ -229,10 +231,10 @@ pub fn spawn_warehouse(
         let z = angle.sin() * ring_radius;
         let light_pos = sphere_pos + Vec3::new(x, light_height, z);
         
-        // Spawn spotlight pointing upward
+        // Spawn spotlight pointing sideways (tangent to the circle)
         commands.spawn(SpotLightBundle {
             spot_light: SpotLight {
-                intensity: 100000000.0,
+                intensity: 10000000000.0,
                 color: Color::srgb(0.1, 0.5, 1.0),
                 shadows_enabled: true,
                 outer_angle: 1.2,
@@ -242,7 +244,7 @@ pub fn spawn_warehouse(
                 ..default()
             },
             transform: Transform::from_translation(light_pos)
-                .looking_to(Vec3::Y, -Vec3::new(x, 0.0, z).normalize()),
+                .looking_to(Vec3::new(-z, 0.0, x).normalize(), Vec3::Y),
             ..default()
         });
 

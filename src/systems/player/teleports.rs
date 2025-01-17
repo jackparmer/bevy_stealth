@@ -1,19 +1,22 @@
 use bevy::prelude::*;
-use crate::systems::setup::{
-    WALL_Y_POSITION,
+use crate::systems::core::setup::{
     GEOTHERMAL_POSITION,
     RADIO_TOWER_POSITION,
     TRAM_POSITION,
     // Heights
     GEOTHERMAL_BASE_HEIGHT,
     RADIO_TOWER_HEIGHT,
-    WALL_HEIGHT,
     // Widths
     GEOTHERMAL_BASE_RADIUS,
     RADIO_TOWER_WIDTH,
 };
 
-use crate::systems::ladder::{
+use crate::systems::environments::launch_silo::{
+    WALL_Y_POSITION,
+    WALL_HEIGHT,
+};
+
+use crate::systems::environments::ladder::{
     LADDER_START,
     LADDER_WIDTH,
 };

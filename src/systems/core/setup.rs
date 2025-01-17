@@ -1,8 +1,9 @@
 use crate::components::Protagonist;
 use crate::resources::Animations;
-use crate::systems::portal::{TopPortalSensor, BottomPortalSensor};
-use crate::systems::ladder::{spawn_ladder, LadderConfig};
-use crate::systems::warehouse::spawn_warehouse;
+use crate::systems::environments::portal::{TopPortalSensor, BottomPortalSensor};
+use crate::systems::environments::ladder::{spawn_ladder, LadderConfig};
+use crate::systems::environments::ice_cave::spawn_ice_cave;
+use crate::systems::environments::launch_silo::spawn_launch_silo;
 
 use avian3d::prelude::*;
 use bevy::{
@@ -15,12 +16,6 @@ use bevy::math::Vec3;
 use bevy::render::texture::{ImageSampler, ImageAddressMode, ImageSamplerDescriptor};
 
 // Constants for structure dimensions
-pub const WALL_HEIGHT: f32 = 600.0;
-pub const WALL_Y_POSITION: f32 = 100.0;
-const WALL_NORTH_POSITION: Vec3 = Vec3::new(0.0, WALL_Y_POSITION, -50.0);
-const WALL_SOUTH_POSITION: Vec3 = Vec3::new(0.0, WALL_Y_POSITION, 50.0);
-const WALL_EAST_POSITION: Vec3 = Vec3::new(40.0, WALL_Y_POSITION, 0.0);
-const WALL_WEST_POSITION: Vec3 = Vec3::new(-40.0, WALL_Y_POSITION, 0.0);
 
 pub const GEOTHERMAL_BASE_HEIGHT: f32 = 250.0;
 pub const GEOTHERMAL_BASE_RADIUS: f32 = 100.0;
@@ -168,24 +163,6 @@ pub fn setup(
         Name::new("SubFloor"),
     ));    
 
-    /*
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(90.0, 0.2, 90.0),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(90.0, 0.2, 90.0)),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/ice_texture2.png")),
-                metallic: 1.0,
-                ..default()
-            }),
-            transform: Transform::from_xyz(0.0, -80.0, 0.0),
-            ..default()
-        },
-        Name::new("AquifierFloor"),
-    ));
-    */
-
     commands.spawn((
         RigidBody::Static,
         ColliderConstructor::TrimeshFromMesh,
@@ -312,70 +289,8 @@ pub fn setup(
         ));
     }
 
-
-    // North wall
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(100.0, WALL_HEIGHT, 20.0),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(100.0, WALL_HEIGHT, 20.0)),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/concrete.png")),
-                metallic: 1.0,
-                ..default()
-            }),
-            transform: Transform::from_translation(WALL_NORTH_POSITION),
-            ..default()
-        },
-    ));
-
-    // South wall 
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(100.0, WALL_HEIGHT, 20.0),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(100.0, WALL_HEIGHT, 20.0)),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/concrete.png")),
-                metallic: 1.0,
-                ..default()
-            }),
-            transform: Transform::from_translation(WALL_SOUTH_POSITION),
-            ..default()
-        },
-    ));
-
-    // East wall
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(20.0, WALL_HEIGHT, 80.0),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(20.0, WALL_HEIGHT, 80.0)),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/concrete.png")),
-                metallic: 1.0,
-                ..default()
-            }),
-            transform: Transform::from_translation(WALL_EAST_POSITION),
-            ..default()
-        },
-    ));
-
-    // West wall
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(20.0, WALL_HEIGHT, 80.0),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(20.0, WALL_HEIGHT, 80.0)),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/concrete.png")),
-                metallic: 1.0,
-                ..default()
-            }),
-            transform: Transform::from_translation(WALL_WEST_POSITION),
-            ..default()
-        },
-    ));
+    // Replace the wall spawning code with:
+    spawn_launch_silo(&mut commands, &mut meshes, &mut materials, &asset_server);
 
     // GLTF Protagonist
 
@@ -609,5 +524,5 @@ pub fn setup(
         },
     );    
 
-    spawn_warehouse(&mut commands, &mut meshes, &mut materials, &asset_server);
+    spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server);
 }

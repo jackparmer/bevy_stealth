@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::systems::setup::TramCar;
+use crate::systems::core::setup::TramCar;
 
 pub fn move_tram(
     time: Res<Time>,

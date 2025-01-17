@@ -20,8 +20,6 @@ pub fn keyboard_animation_control(
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animations: Res<Animations>,
     mut current_animation: Local<usize>,
-    mut commands: Commands,
-    time: Res<Time>,
 ) {
 
     let turn_speed = 3.0; // Fixed rotation speed (radians per second)

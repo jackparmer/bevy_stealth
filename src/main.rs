@@ -1,25 +1,33 @@
-mod systems;
+mod systems {
+    pub mod core;
+    pub mod environments;
+    pub mod player;
+}
+
 mod components;
 mod resources;
 
 use crate::components::Protagonist;
 use crate::resources::{Animations, SCENES};
 
-use systems::portal::portal_system;
-use systems::setup::setup;
-use systems::terrain::{spawn_terrain, toggle_terrain_texture};
-use systems::airlock::{spawn_airlock, handle_airlock_teleport, blink_airlock_light};
-use systems::climbing::{handle_climbing, climbing_keyboard_control, check_ladder_presence};
-use systems::swimming::swimming_system;
-use systems::driving::{toggle_driving, driving_control};
-use systems::teleports::teleport_system;
-use systems::tram::move_tram;
-use systems::camera::rotate_camera;
-use systems::input::keyboard_animation_control;
-use systems::falling;
-use systems::timer::{setup_debug_timer, print_protagonist_transform};
-use systems::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
-use systems::minimap::{setup_minimap, update_minimap};
+use systems::core::setup::setup;
+use systems::core::camera::rotate_camera;
+use systems::core::input::keyboard_animation_control;
+use systems::core::timer::{setup_debug_timer, print_protagonist_transform};
+use systems::core::minimap::{setup_minimap, update_minimap};
+
+use systems::player::climbing::{handle_climbing, climbing_keyboard_control, check_ladder_presence};
+use systems::player::swimming::swimming_system;
+use systems::player::driving::{toggle_driving, driving_control};
+use systems::player::teleports::teleport_system;
+use systems::player::falling;
+
+use systems::environments::portal::portal_system;
+use systems::environments::terrain::{spawn_terrain, toggle_terrain_texture};
+use systems::environments::airlock::{spawn_airlock, handle_airlock_teleport, blink_airlock_light};
+use systems::environments::tram::move_tram;
+use systems::environments::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
+
 use avian3d::prelude::*;
 use bevy::{
     animation::animate_targets,
