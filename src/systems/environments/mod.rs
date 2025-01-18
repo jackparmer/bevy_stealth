@@ -6,3 +6,4 @@ pub mod airlock;
 pub mod ladder;
 pub mod ice_cave;
 pub mod launch_silo;
+pub mod reactor;

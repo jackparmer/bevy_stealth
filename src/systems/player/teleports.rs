@@ -25,6 +25,7 @@ const AIRLOCK_POSITION: Vec3 = Vec3::new(779.1837, 2.6249955, -423.27768);
 const GAME_START: Vec3 = Vec3::new(165.00298, 2.6249952, -150.00085);
 
 const OUTSIDE: Vec3 = Vec3::new(1102.4198, 2.6249733, -456.37585);
+const REACTOR: Vec3 = Vec3::new(-485.34103, 4.6249764, -1066.1226);
 
 use crate::components::Protagonist;
 
@@ -65,6 +66,8 @@ pub fn teleport_system(
         Some((pos, "Wall"))
     } else if keyboard.just_pressed(KeyCode::Digit9) {
         Some((OUTSIDE, "Outside"))
+    } else if keyboard.just_pressed(KeyCode::Digit0) {
+        Some((REACTOR, "Reactor"))
     } else {
         None
     };

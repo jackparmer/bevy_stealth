@@ -4,6 +4,7 @@ use crate::systems::environments::portal::{TopPortalSensor, BottomPortalSensor};
 use crate::systems::environments::ladder::{spawn_ladder, LadderConfig};
 use crate::systems::environments::ice_cave::spawn_ice_cave;
 use crate::systems::environments::launch_silo::spawn_launch_silo;
+use crate::systems::environments::reactor::spawn_reactor;
 
 use avian3d::prelude::*;
 use bevy::{
@@ -525,4 +526,6 @@ pub fn setup(
     );    
 
     spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server);
+
+    spawn_reactor(&mut commands, &mut meshes, &mut materials, &asset_server);
 }

@@ -11,10 +11,10 @@ pub struct MinimapMarker;
 #[derive(Component)]
 pub struct MinimapCamera;
 
-const MINIMAP_CAMERA_HEIGHT: f32 = 1000.0;
+const MINIMAP_CAMERA_HEIGHT: f32 = 2000.0;
 const MINIMAP_SMOOTHING_SPEED: f32 = 5.0;
 const MINIMAP_POSITION_PRECISION: f32 = 100.0; // For rounding
-const MINIMAP_MARKER_HEIGHT: f32 = 200.0; // Half of MINIMAP_CAMERA_HEIGHT
+const MINIMAP_MARKER_HEIGHT: f32 = 500.0; // Half of MINIMAP_CAMERA_HEIGHT
 const MINIMAP_MARKER_SIZE: f32 = 3.0;
 
 pub fn setup_minimap(
