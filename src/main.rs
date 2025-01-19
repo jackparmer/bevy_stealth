@@ -27,6 +27,7 @@ use systems::environments::terrain::{spawn_terrain, toggle_terrain_texture};
 use systems::environments::airlock::{spawn_airlock, handle_airlock_teleport, blink_airlock_light};
 use systems::environments::tram::move_tram;
 use systems::environments::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
+use systems::environments::reactor::update_twinkling_lights;
 
 use avian3d::prelude::*;
 use bevy::{
@@ -73,6 +74,7 @@ fn main() {
         .add_systems(Update, print_protagonist_transform)
         .add_systems(Startup, setup_minimap)
         .add_systems(Update, update_minimap)
+        .add_systems(Update, update_twinkling_lights)
         .run();
 }
 
@@ -128,6 +130,7 @@ fn reset_game_on_command_r(
     materials: ResMut<Assets<StandardMaterial>>,
     graphs: ResMut<Assets<AnimationGraph>>,
     images: ResMut<Assets<Image>>,
+    time: Res<Time>,
 ) {
     // Check for Command-R (Mac) or Ctrl-R (Other systems)
     let is_command_r = keyboard_input.pressed(KeyCode::SuperLeft) && keyboard_input.just_pressed(KeyCode::KeyR);
@@ -146,6 +149,6 @@ fn reset_game_on_command_r(
         }        
 
         // Re-run the setup logic to reinitialize the game
-        setup(commands, asset_server, meshes, materials, graphs, images);
+        setup(commands, asset_server, meshes, materials, graphs, images, time);
     }
 }

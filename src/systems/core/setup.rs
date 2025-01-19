@@ -61,6 +61,7 @@ pub fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut graphs: ResMut<Assets<AnimationGraph>>,
     mut images: ResMut<Assets<Image>>,
+    time: Res<Time>,
 ) {
 
     // Build the animation graph
@@ -527,5 +528,5 @@ pub fn setup(
 
     spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server);
 
-    spawn_reactor(&mut commands, &mut meshes, &mut materials, &asset_server);
+    spawn_reactor(&mut commands, &mut meshes, &mut materials, &asset_server, time);
 }
