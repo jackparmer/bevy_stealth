@@ -196,7 +196,7 @@ pub fn spawn_reactor(
         ..default()
     });
 
-    // Add structural support beams in corners
+    // Add structural support beams in corners (now full height)
     let beam_material = materials.add(StandardMaterial {
         base_color_texture: Some(asset_server.load("textures/rusty_metal_03_diff_4k.png")),
         metallic: 0.9,
@@ -204,57 +204,38 @@ pub fn spawn_reactor(
         ..default()
     });
 
-    for i in 0..4 {
-        let angle = (i as f32) * std::f32::consts::PI / 2.0;
-        let beam_pos = Vec3::new(
-            angle.cos() * (CUBE_SIZE * 0.45),
-            0.0,
-            angle.sin() * (CUBE_SIZE * 0.45)
-        );
-        
-        commands.spawn((
-            RigidBody::Static,
-            Collider::cylinder(CUBE_SIZE/2.0, 8.0),
-            PbrBundle {
-                mesh: meshes.add(Cylinder::new(8.0, CUBE_SIZE)),
-                material: beam_material.clone(),
-                transform: Transform::from_translation(REACTOR_POSITION + beam_pos),
-                ..default()
-            },
-        ));
-    }
-
-    // Sconce material with bright emission
+    // Add sconce material definition
     let sconce_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.8, 0.6, 0.2),
-        emissive: Color::srgb(2.0, 1.0, 0.25).into(), // Reduced base intensity
-        metallic: 0.7,
-        perceptual_roughness: 0.3,
+        base_color: Color::rgb(0.8, 0.6, 0.2),
+        emissive: Color::rgb(3.0, 1.5, 0.375).into(),
+        metallic: 0.5,
+        perceptual_roughness: 0.4,
         ..default()
     });
 
+    // Main support pillars (shortened)
     for i in 0..6 {
         let angle = (i as f32) * std::f32::consts::PI / 3.0;
-        let vent_pos = Vec3::new(
+        let pillar_pos = Vec3::new(
             angle.cos() * (CUBE_SIZE * 0.35),
-            0.0,
+            CUBE_SIZE * 0.5, // Lowered center point
             angle.sin() * (CUBE_SIZE * 0.35)
         );
         
-        // Vent housing (pillar) with collider
+        // Shortened pillar with collider
         commands.spawn((
             RigidBody::Static,
-            Collider::cylinder(8.0, CUBE_SIZE),
+            Collider::cylinder(CUBE_SIZE, 8.0), // Shortened height
             PbrBundle {
-                mesh: meshes.add(Cylinder::new(8.0, CUBE_SIZE)),
+                mesh: meshes.add(Cylinder::new(8.0, CUBE_SIZE * 2.0)), // Shortened height
                 material: material.clone(),
-                transform: Transform::from_translation(REACTOR_POSITION + vent_pos),
+                transform: Transform::from_translation(REACTOR_POSITION + pillar_pos),
                 ..default()
             },
         ));
 
-        // Add sconces around pillar base and midway
-        for height_level in [-0.2, -0.35, -0.45] {
+        // Add sconces around pillar at various heights
+        for height_level in [-0.8, -0.6, -0.45, -0.35, -0.2, 0.2, 0.35, 0.45, 0.6, 0.8] {
             for sconce_angle in 0..3 {
                 let sconce_rotation = Quat::from_rotation_y(sconce_angle as f32 * std::f32::consts::PI * 2.0 / 3.0);
                 let offset = sconce_rotation * Vec3::new(9.0, 0.0, 0.0);
@@ -263,7 +244,7 @@ pub fn spawn_reactor(
                     mesh: meshes.add(Cylinder::new(1.5, 1.0)),
                     material: sconce_material.clone(),
                     transform: Transform::from_translation(
-                        REACTOR_POSITION + vent_pos + offset + Vec3::new(0.0, CUBE_SIZE * height_level, 0.0)
+                        REACTOR_POSITION + pillar_pos + offset + Vec3::new(0.0, CUBE_SIZE * height_level, 0.0)
                     ).with_rotation(sconce_rotation),
                     ..default()
                 });
@@ -271,68 +252,15 @@ pub fn spawn_reactor(
         }
     }
 
-    // Add upper cube support pillars
-    let upper_y_offset = CUBE_SIZE - CUBE_WALL_THICKNESS;
-
-    // Upper cube top wall only
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(CUBE_SIZE + CUBE_WALL_THICKNESS, CUBE_WALL_THICKNESS, CUBE_SIZE + CUBE_WALL_THICKNESS),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(CUBE_SIZE + CUBE_WALL_THICKNESS, CUBE_WALL_THICKNESS, CUBE_SIZE + CUBE_WALL_THICKNESS)),
-            material: material.clone(),
-            transform: Transform::from_translation(REACTOR_POSITION + Vec3::new(0.0, upper_y_offset + CUBE_SIZE/2.0, 0.0)),
-            ..default()
-        },
-    ));
-
-    // Add upper vent pillars
-    for i in 0..6 {
-        let angle = (i as f32) * std::f32::consts::PI / 3.0;
-        let vent_pos = Vec3::new(
-            angle.cos() * (CUBE_SIZE * 0.35),
-            upper_y_offset,  // Start from the base
-            angle.sin() * (CUBE_SIZE * 0.35)
-        );
-        
-        commands.spawn((
-            RigidBody::Static,
-            Collider::cylinder(8.0, CUBE_SIZE * 2.0),  // Double the height
-            PbrBundle {
-                mesh: meshes.add(Cylinder::new(8.0, CUBE_SIZE * 2.0)),  // Double the height
-                material: material.clone(),
-                transform: Transform::from_translation(REACTOR_POSITION + vent_pos),
-                ..default()
-            },
-        ));
-
-        // Add sconces around upper pillar
-        for height_level in [-0.2, -0.35, -0.45] {
-            for sconce_angle in 0..3 {
-                let sconce_rotation = Quat::from_rotation_y(sconce_angle as f32 * std::f32::consts::PI * 2.0 / 3.0);
-                let offset = sconce_rotation * Vec3::new(9.0, 0.0, 0.0);
-                
-                commands.spawn(PbrBundle {
-                    mesh: meshes.add(Cylinder::new(1.5, 1.0)),
-                    material: sconce_material.clone(),
-                    transform: Transform::from_translation(
-                        REACTOR_POSITION + vent_pos + offset + Vec3::new(0.0, CUBE_SIZE * height_level, 0.0)
-                    ).with_rotation(sconce_rotation),
-                    ..default()
-                });
-            }
-        }
-    }
-
-    // After spawning the upper vent pillars, add random sconces
+    // Remove the old upper cube support pillars section and continue with random sconces
     let mut rng = rand::thread_rng();
     
-    // Add random sconces to vent pillars
+    // Add random sconces to the full-height pillars
     for i in 0..6 {
         let angle = (i as f32) * std::f32::consts::PI / 3.0;
         let pillar_base_pos = Vec3::new(
             angle.cos() * (CUBE_SIZE * 0.35),
-            upper_y_offset,  // Start from the base of the pillar
+            0.0,  // Start from the bottom
             angle.sin() * (CUBE_SIZE * 0.35)
         );
         
