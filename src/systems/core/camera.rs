@@ -39,7 +39,7 @@ pub fn rotate_camera(
                 },
                 HighAltitudeIndicator,
             )).set_parent(protagonist_entity);
-        } else {
+        } else if (!is_high_altitude && has_indicator) || protagonist.is_dirigible {
             // Remove indicator when below threshold
             for entity in high_altitude_indicator_query.iter() {
                 commands.entity(entity).despawn_recursive();
