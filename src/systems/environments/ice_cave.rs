@@ -13,12 +13,13 @@ pub fn spawn_ice_cave(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     asset_server: &Res<AssetServer>,
 ) {
-    let sphere_pos = Vec3::new(-455.0, 1.6, 915.0);
+    let sphere_pos = Vec3::new(-455.0 * 2.0, 1.6, 915.0 * 2.0);
     let radius = 400.0;
     let segments = 256; // Resolution of the sphere
     let noise_scale = 8.0; 
     let noise_amplitude = 200.0; 
     let opening_size = 0.5; // Size of the hole (0.0 to 1.0)
+    let cube_size = 40.0;
 
     let perlin = Perlin::new(42); // Seed of 42
 
@@ -106,15 +107,16 @@ pub fn spawn_ice_cave(
 
     // Create material with a rocky texture - adjusted for better interior lighting
     let material = materials.add(StandardMaterial {
-        base_color_texture: Some(asset_server.load("textures/ice_texture2.png")),
-        base_color: Color::srgb(0.7, 0.8, 1.0),  // Added blue tint
-        perceptual_roughness: 0.9,
-        metallic: 0.1,
+        base_color_texture: None,
+        base_color: Color::srgb(0.01, 0.01, 0.01),  // Nearly pure black
+        perceptual_roughness: 0.5,  // More roughness to reduce reflections
+        metallic: 0.2,  // Much less metallic
         double_sided: true,
         cull_mode: None,
         unlit: false,
-        reflectance: 1.0,
-        emissive: Color::srgb(0.0, 0.02, 0.1).into(),  // Added blue emissive glow
+        reflectance: 0.1,  // Minimal reflectance
+        emissive: Color::srgb(0.0, 0.0, 0.0).into(),
+        alpha_mode: AlphaMode::Opaque,  // Ensure fully opaque
         ..default()
     });
 
@@ -131,8 +133,6 @@ pub fn spawn_ice_cave(
         RigidBody::Static,
     ));
 
-    // Parameters for the cube layer
-    let cube_size = 80.0;
 
     // Generate vertices for cube positions (but don't create the sphere mesh)
     let mut vertices: Vec<Vec3> = Vec::new();
@@ -180,11 +180,11 @@ pub fn spawn_ice_cave(
 
         let radius_variation = cube_size * (0.8 + fastrand::f32() * 0.4);
         let hue_variation = Color::hsl(
-            200.0 + fastrand::f32() * 20.0,  // blue hue range: 200-220
-            0.1 + fastrand::f32() * 0.2,     // low saturation: 0.1-0.3
-            0.8 + fastrand::f32() * 0.2,     // high lightness: 0.8-1.0
+            220.0 + fastrand::f32() * 40.0,  // blue-purple hue range: 220-260
+            0.6 + fastrand::f32() * 0.3,     // medium-high saturation: 0.6-0.9
+            0.5 + fastrand::f32() * 0.3,     // medium-high lightness: 0.5-0.8
         );
-        let emissive_strength = fastrand::f32() * 0.15; // Random emissive strength between 0 and 0.15
+        let emissive_strength = 0.2 + fastrand::f32() * 0.4; // Stronger emissive between 0.2 and 0.6
 
         let texture_path = if fastrand::f32() < 0.5 {
             "textures/snow_01_diff_4k.png"
@@ -200,10 +200,14 @@ pub fn spawn_ice_cave(
             )),
             material: materials.add(StandardMaterial {
                 base_color: hue_variation,
-                metallic: 0.1,
-                perceptual_roughness: 0.7,
-                reflectance: 0.3,
-                emissive: Color::srgb(0.0, emissive_strength, emissive_strength * 2.0).into(),
+                metallic: 0.9,                // Increased metallic for crystal shine
+                perceptual_roughness: 0.1,    // Decreased roughness for more shine
+                reflectance: 0.8,             // Increased reflectance
+                emissive: Color::srgb(
+                    emissive_strength * 0.2,  // Slight red
+                    emissive_strength * 0.4,  // Medium blue
+                    emissive_strength         // Strong blue/purple
+                ).into(),
                 base_color_texture: Some(asset_server.load(texture_path)),
                 uv_transform: if fastrand::bool() { 
                     StandardMaterial::FLIP_HORIZONTAL 
@@ -234,7 +238,7 @@ pub fn spawn_ice_cave(
         // Spawn spotlight pointing sideways (tangent to the circle)
         commands.spawn(SpotLightBundle {
             spot_light: SpotLight {
-                intensity: 10000000000.0,
+                intensity: 10000.0,
                 color: Color::srgb(0.1, 0.5, 1.0),
                 shadows_enabled: true,
                 outer_angle: 1.2,
@@ -262,9 +266,9 @@ pub fn spawn_water_feature(
     basin_pos: Vec3,
 ) {
     // Dimensions
-    let wall_height = 2.5;  // Reduced from 4.0
-    let wall_thickness = 4.0;  // Increased from 0.67
-    let basin_width = 20.0;  // Kept the same
+    let wall_height = 0.5;  // 5x lower (was 2.5)
+    let wall_thickness = 4.0;
+    let basin_width = 60.0;  // 3x bigger (was 20.0)
     
     // Wall configurations: (is_vertical, offset_x, offset_z)
     let wall_configs = [
@@ -303,15 +307,29 @@ pub fn spawn_water_feature(
 
     // Water surface (simple flat rectangle)
     commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(19.33, 0.033, 19.33)),
+        mesh: meshes.add(Cuboid::new(basin_width - 0.67, 0.033, basin_width - 0.67)),
         material: materials.add(StandardMaterial {
             base_color: Color::srgba(0.0, 0.8, 1.0, 0.8),
             emissive: Color::srgba(0.0, 1.0, 2.0, 1.0).into(),
             alpha_mode: AlphaMode::Blend,
             ..default()
         }),
-        transform: Transform::from_translation(basin_pos + Vec3::new(0.0, wall_height - 1.0, 0.0)),  // 1 meter below wall height
+        transform: Transform::from_translation(basin_pos + Vec3::new(0.0, wall_height - 0.2, 0.0)),
         ..default()
     })
     .insert(NotShadowCaster);
+
+    // Replace spotlight with emissive cuboid for god ray effect
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Cuboid::new(4.0, 400.0, 4.0)),  // Tall, thin cuboid
+        material: materials.add(StandardMaterial {
+            base_color: Color::rgba(0.4, 0.8, 1.0, 0.15),  // Bright blue, mostly transparent
+            emissive: Color::rgb(0.4, 0.8, 1.0).into(),   // Bright blue glow
+            alpha_mode: AlphaMode::Blend,
+            ..default()
+        }),
+        transform: Transform::from_translation(basin_pos + Vec3::new(0.0, 200.0, 0.0)),  // Center height of the beam
+        ..default()
+    })
+    .insert(NotShadowCaster);  // Ensure it doesn't cast shadows
 }

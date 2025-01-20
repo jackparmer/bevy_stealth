@@ -1,22 +1,61 @@
 use bevy::prelude::*;
-use crate::components::Protagonist;
+use crate::components::{Protagonist, HighAltitudeIndicator};
 
 pub fn rotate_camera(
     time: Res<Time>,
-    protagonist_query: Query<(&Transform, &Protagonist)>, // Added Protagonist component
+    protagonist_query: Query<(Entity, &Transform, &Protagonist, Option<&Children>)>,
     mut camera_query: Query<&mut Transform, (With<Camera3d>, Without<Protagonist>)>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    high_altitude_indicator_query: Query<Entity, With<HighAltitudeIndicator>>,
 ) {
-    if let Ok((protagonist_transform, protagonist)) = protagonist_query.get_single() {
+    if let Ok((protagonist_entity, protagonist_transform, protagonist, children)) = protagonist_query.get_single() {
         let protagonist_position = protagonist_transform.translation;
         let protagonist_rotation = protagonist_transform.rotation;
 
+        // Handle high altitude indicator
+        let is_high_altitude = protagonist_position.y > 100.0;
+        let has_indicator = high_altitude_indicator_query.iter().next().is_some();
+
+        if is_high_altitude && 
+        !has_indicator && 
+        !protagonist.is_falling && 
+        !protagonist.is_dirigible &&
+        !protagonist.is_climbing {
+            // Create emissive disk
+            commands.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Circle::new(2.0)),
+                    material: materials.add(StandardMaterial {
+                        base_color: Color::srgba(1.0, 0.8, 0.0, 0.5),
+                        emissive: Color::srgb(2.0, 1.0, 0.0).into(),
+                        alpha_mode: AlphaMode::Blend,
+                        ..default()
+                    }),
+                    transform: Transform::from_translation(Vec3::new(0.0, 0.1, 0.0))
+                        .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+                    ..default()
+                },
+                HighAltitudeIndicator,
+            )).set_parent(protagonist_entity);
+        } else {
+            // Remove indicator when below threshold
+            for entity in high_altitude_indicator_query.iter() {
+                commands.entity(entity).despawn_recursive();
+            }
+        }
+
         for mut camera_transform in camera_query.iter_mut() {
             // Adjust follow offset based on state
-            let follow_offset = match (protagonist.is_driving, protagonist.is_climbing) {
-                (true, false) => Vec3::new(0.0, 20.0, 90.0),  // Driving
-                (false, true) => Vec3::new(0.0, 2.0, 30.0),  // Climbing
-                (false, false) => Vec3::new(0.0, 2.0, 15.0),  // Default state
-                _ => Vec3::new(0.0, 2.0, 15.0),  // Fallback for invalid states
+            let follow_offset = if protagonist_position.y > 100.0 {
+                Vec3::new(0.0, 30.0, 100.0)
+            } else if protagonist.is_driving && !protagonist.is_climbing {
+                Vec3::new(0.0, 20.0, 90.0)  // Driving
+            } else if !protagonist.is_driving && protagonist.is_climbing {
+                Vec3::new(0.0, 2.0, 30.0)   // Climbing
+            } else {
+                Vec3::new(0.0, 2.0, 15.0)   // Default state (including invalid states)
             };
 
             // Calculate the new camera position by applying the protagonist's rotation to the offset

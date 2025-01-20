@@ -8,6 +8,7 @@ pub struct Protagonist {
     pub is_swimming: bool,
     pub was_swimming: bool,
     pub is_driving: bool,
+    pub is_dirigible: bool,
 }
 
 impl Default for Protagonist {
@@ -19,6 +20,10 @@ impl Default for Protagonist {
             is_swimming: false,
             was_swimming: false,
             is_driving: false,
+            is_dirigible: false,
         }
     }
 }
+
+#[derive(Component)]
+pub struct HighAltitudeIndicator;

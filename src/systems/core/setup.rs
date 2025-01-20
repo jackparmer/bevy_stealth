@@ -1,6 +1,5 @@
 use crate::components::Protagonist;
 use crate::resources::Animations;
-use crate::systems::environments::portal::{TopPortalSensor, BottomPortalSensor};
 use crate::systems::environments::ladder::{spawn_ladder, LadderConfig};
 use crate::systems::environments::ice_cave::spawn_ice_cave;
 use crate::systems::environments::launch_silo::spawn_launch_silo;
@@ -22,28 +21,31 @@ pub const GEOTHERMAL_BASE_HEIGHT: f32 = 250.0;
 pub const GEOTHERMAL_BASE_RADIUS: f32 = 100.0;
 pub const GEOTHERMAL_POSITION: Vec3 = Vec3::new(200.0, 0.0, 200.0);
 
-pub const RADIO_TOWER_HEIGHT: f32 = 300.0;
+pub const RADIO_TOWER_HEIGHT: f32 = 400.0;
 pub const RADIO_TOWER_WIDTH: f32 = 25.0;
-pub const RADIO_TOWER_POSITION: Vec3 = Vec3::new(200.0, 100.0, 200.0);
+pub const RADIO_TOWER_POSITION: Vec3 = Vec3::new(200.0, 200.0, 200.0);
 
-pub const BRIDGE_LENGTH: f32 = 250.0;
+pub const BRIDGE_LENGTH: f32 = 300.0;
 pub const BRIDGE_HEIGHT: f32 = 10.0;
-pub const BRIDGE_WIDTH: f32 = 10.0;
-pub const BRIDGE_POSITION: Vec3 = Vec3::new(100.0, 240.0, 100.0);
+pub const BRIDGE_WIDTH: f32 = 20.0;
+pub const BRIDGE_POSITION: Vec3 = Vec3::new(100.0, 394.99, 100.0);
 
 pub const TRAM_POSITION: Vec3 = Vec3::new(100.0, 245.5, 100.0);
 
-pub const WORLD_RADIUS: f32 = 1500.0;
+pub const WORLD_RADIUS: f32 = 5000.0;
 
-pub const TOWER_LADDER_START: Vec3 = Vec3::new(214.0, 100.0, 200.0);
-pub const ACQUIFER_LADDER_START: Vec3 = Vec3::new(50.0, 245.0, 50.0);
+pub const TOWER_LADDER_START: Vec3 = Vec3::new(214.0, 200.0, 200.0);
+
+pub const PERIMETER_WALL_HEIGHT: f32 = 5000.0;
+
+pub const ACQUIFIER_FLOOR_DEPTH: f32 = -1000.0;
 
 struct ProtagonistStart {
     position: Vec3,
 }
 
 const PROTAGONIST_START: ProtagonistStart = ProtagonistStart {
-    position: Vec3::new(150.0, 40.0, -150.0),
+    position: Vec3::new(204.0, 3.0, -35.0),
 };
 
 #[derive(Component)]
@@ -94,8 +96,8 @@ pub fn setup(
         },
         /*
         EnvironmentMapLight {
-            diffuse_map: asset_server.load("environment_maps/pisa_diffuse_rgb9e5_zstd.ktx2"),
-            specular_map: asset_server.load("environment_maps/pisa_specular_rgb9e5_zstd.ktx2"),
+            diffuse_map: asset_server.load("environment_maps/diffuse_rgb9e5_zstd.ktx2"),
+            specular_map: asset_server.load("environment_maps/specular_rgb9e5_zstd.ktx2"),
             intensity: 250.0,
         }
         */
@@ -103,8 +105,8 @@ pub fn setup(
 
     // Add Ambient Light
     commands.insert_resource(AmbientLight {
-        color: Color::srgb(0.2, 0.2, 0.3),
-        brightness: 600.0,
+        color: Color::srgb(0.1, 0.1, 0.3),
+        brightness: 100.0,
     });
 
     // Add Directional Lighting
@@ -193,62 +195,17 @@ pub fn setup(
         },
     ));
 
-    // Top sensor circle
-    let sensor_position = Vec3::new(-10.0, 0.6, 10.0);
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cylinder(5.0, 1.0),
-        Sensor,
-        TopPortalSensor,
-        PbrBundle {
-            mesh: meshes.add(Cylinder { 
-                radius: 5.0,
-                half_height: 0.1,
-            }),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/star_well.png")),
-                base_color: Color::srgba(0.1, 0.1, 0.3, 0.9),
-                metallic: 0.0,
-                perceptual_roughness: 1.0,
-                unlit: true,
-                ..default()
-            }),
-            transform: Transform::from_translation(sensor_position),
-            ..default()
-        },
-    ));
-
-    // Bottom sensor circle
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cylinder(5.0, 1.0),
-        Sensor,
-        BottomPortalSensor,
-        PbrBundle {
-            mesh: meshes.add(Cylinder {
-                radius: 5.0,
-                half_height: 0.1,
-            }),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/star_well.png")),
-                base_color: Color::srgba(0.3, 0.1, 0.1, 0.9),
-                metallic: 0.0,
-                perceptual_roughness: 1.0,
-                unlit: true,
-                ..default()
-            }),
-            transform: Transform::from_xyz(-10.0, -5.4, 10.0),
-            ..default()
-        },
-    ));
-
     // Starship
     commands.spawn((
         SceneBundle {
             scene: asset_server
                 .load(GltfAssetLabel::Scene(0).from_asset("models/starhopper.glb")),
-            transform: Transform::from_xyz(300.0, -45.0, 300.0)
-                .with_scale(Vec3::splat(2.0)),
+            transform: Transform::from_xyz(
+                RADIO_TOWER_POSITION.x, 
+                RADIO_TOWER_POSITION.y + RADIO_TOWER_HEIGHT/2.0, 
+                RADIO_TOWER_POSITION.z
+            )
+                .with_scale(Vec3::splat(1.0)),
             ..default()
         },
         ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMesh),
@@ -262,8 +219,8 @@ pub fn setup(
 
     for _ in 0..30 {
         // Generate a random position between tundra and acquifier floor
-        let distance = rng_glacier.gen_range(100.0..900.0);
-        let y = rng_glacier.gen_range(-200.0..-50.0); // Fixed: start < end
+        let distance = rng_glacier.gen_range(100.0..WORLD_RADIUS);
+        let y = rng_glacier.gen_range(-950.0..-50.0); // Fixed: start < end
         let angle = rng_glacier.gen_range(0.0..std::f32::consts::TAU);
         let x = distance * angle.cos();
         let z = distance * angle.sin();
@@ -275,7 +232,7 @@ pub fn setup(
             rng_glacier.gen_range(0.0..std::f32::consts::TAU),
             rng_glacier.gen_range(-0.2..0.2),
         );
-        let scale = rng_glacier.gen_range(1.0..3.0);
+        let scale = rng_glacier.gen_range(1.0..15.0);
     
         commands.spawn((
             SceneBundle {
@@ -309,6 +266,7 @@ pub fn setup(
             is_swimming: false,
             was_swimming: false,
             is_driving: false,
+            is_dirigible: false,
         },
         SceneBundle {       
             scene: asset_server
@@ -346,11 +304,11 @@ pub fn setup(
     // Geothermal station base (before radio tower)
     commands.spawn((
         RigidBody::Static,
-        Collider::cylinder(GEOTHERMAL_BASE_RADIUS, GEOTHERMAL_BASE_HEIGHT),
+        Collider::capsule(GEOTHERMAL_BASE_RADIUS, GEOTHERMAL_BASE_HEIGHT),
         PbrBundle {
-            mesh: meshes.add(Cylinder {
+            mesh: meshes.add(Capsule3d {
                 radius: GEOTHERMAL_BASE_RADIUS,
-                half_height: GEOTHERMAL_BASE_HEIGHT / 2.0,
+                half_length: GEOTHERMAL_BASE_HEIGHT / 2.0,
             }),
             material: materials.add(StandardMaterial {
                 base_color_texture: Some(asset_server.load("textures/concrete.png")),
@@ -410,17 +368,18 @@ pub fn setup(
         PbrBundle {
             mesh: meshes.add(Extrusion::new(
                 Annulus::new(WORLD_RADIUS - 100.0, WORLD_RADIUS), 
-                300.0  // Height of the wall
+                PERIMETER_WALL_HEIGHT
             )),
             material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/ice_texture3.png")),
-                perceptual_roughness: 0.9,
-                metallic: 0.9,
+                base_color: Color::BLACK,           // Changed to pure black
+                base_color_texture: None,           // Removed texture
+                perceptual_roughness: 0.0,         // Smooth surface
+                metallic: 0.0,                     // Non-metallic
                 double_sided: true,
                 cull_mode: None,
                 ..default()
             }),
-            transform: Transform::from_xyz(0.0, -150.0, 0.0)
+            transform: Transform::from_xyz(0.0, -PERIMETER_WALL_HEIGHT/2.0, 0.0)
                 .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
             ..default()
         },
@@ -442,7 +401,7 @@ pub fn setup(
                 metallic: 0.9,
                 ..default()
             }),
-            transform: Transform::from_xyz(0.0, -300.0, 0.0), 
+            transform: Transform::from_xyz(0.0, ACQUIFIER_FLOOR_DEPTH, 0.0), 
             ..default()
         },
         Name::new("AcquifierFloor"),
@@ -511,20 +470,7 @@ pub fn setup(
             height: 150.0,
             rung_count: 200,
         },
-    );
-
-    spawn_ladder(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &asset_server,
-        LadderConfig {
-            position: ACQUIFER_LADDER_START,
-            rotation: Quat::from_rotation_y(std::f32::consts::FRAC_PI_4 * -1.0),
-            height: 160.0,
-            rung_count: 200,
-        },
-    );    
+    );   
 
     spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server);
 

@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use avian3d::prelude::*;
 
 // Constants for structure dimensions
-pub const WALL_HEIGHT: f32 = 600.0;
-pub const WALL_Y_POSITION: f32 = 100.0;
+pub const WALL_HEIGHT: f32 = 400.0;
+pub const WALL_Y_POSITION: f32 = WALL_HEIGHT/2.0;
 const WALL_NORTH_POSITION: Vec3 = Vec3::new(0.0, WALL_Y_POSITION, -50.0);
 const WALL_SOUTH_POSITION: Vec3 = Vec3::new(0.0, WALL_Y_POSITION, 50.0);
 const WALL_EAST_POSITION: Vec3 = Vec3::new(40.0, WALL_Y_POSITION, 0.0);

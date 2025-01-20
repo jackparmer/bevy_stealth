@@ -7,7 +7,7 @@ use noise::NoiseFn;
 use crate::components::Protagonist;
 
 // Terrain Generation Parameters
-const TERRAIN_RADIUS: f32 = 1500.0;
+const TERRAIN_RADIUS: f32 = 5000.0;
 const TERRAIN_RESOLUTION: i32 = 500;
 const TERRAIN_SEED: u32 = 42;
 const BASE_HEIGHT: f32 = -50.0;

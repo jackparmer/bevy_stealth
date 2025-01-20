@@ -21,13 +21,14 @@ use systems::player::swimming::swimming_system;
 use systems::player::driving::{toggle_driving, driving_control};
 use systems::player::teleports::teleport_system;
 use systems::player::falling;
+use systems::player::dirigible::{toggle_dirigible, dirigible_control, animate_floating_balloon};
 
 use systems::environments::portal::portal_system;
 use systems::environments::terrain::{spawn_terrain, toggle_terrain_texture};
 use systems::environments::airlock::{spawn_airlock, handle_airlock_teleport, blink_airlock_light};
 use systems::environments::tram::move_tram;
 use systems::environments::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
-use systems::environments::reactor::update_twinkling_lights;
+use systems::environments::reactor::{handle_reactor_ladder_exit};
 
 use avian3d::prelude::*;
 use bevy::{
@@ -66,6 +67,7 @@ fn main() {
         .add_systems(Update, underwater_searchlight_system)
         .add_systems(Update, update_searchlight_rotation)
         .add_systems(Update, teleport_system)
+        .add_systems(Update, handle_reactor_ladder_exit)
         .add_systems(Update, (
             falling::check_falling,
             falling::handle_falling_animation,
@@ -74,7 +76,11 @@ fn main() {
         .add_systems(Update, print_protagonist_transform)
         .add_systems(Startup, setup_minimap)
         .add_systems(Update, update_minimap)
-        .add_systems(Update, update_twinkling_lights)
+        .add_systems(Update, (
+            toggle_dirigible,
+            dirigible_control,
+            animate_floating_balloon,
+        ))
         .run();
 }
 

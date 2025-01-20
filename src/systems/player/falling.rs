@@ -26,7 +26,7 @@ pub fn check_falling(
         // Add overhead raycast
         let overhead_ray_pos = transform.translation;
         let overhead_ray_dir = Dir3::Y;
-        let overhead_max_distance = 100.0;
+        let overhead_max_distance = 2000.0;
         let overhead_filter = SpatialQueryFilter::from_excluded_entities([entity]);
         
         let overhead_hits = spatial_query.ray_hits(
@@ -65,22 +65,22 @@ pub fn check_falling(
         protagonist.is_falling = !is_grounded;
 
         // Draw the ray
-        let ray_end = ray_pos + (ray_dir.as_vec3() * max_distance);
-        if is_grounded {
-            gizmos.line(ray_pos, ray_end, Color::srgb(0.0, 1.0, 0.0));  // Green
+        // let ray_end = ray_pos + (ray_dir.as_vec3() * max_distance);
+        // if is_grounded {
+        //     gizmos.line(ray_pos, ray_end, Color::srgb(0.0, 1.0, 0.0));  // Green
             
-            // Draw hit point if there is one
-            if let Some(hit) = hits.first() {
-                let hit_point = ray_pos + (ray_dir.as_vec3() * hit.time_of_impact);
-                gizmos.sphere(hit_point, Quat::IDENTITY, 0.1, Color::srgb(1.0, 1.0, 0.0));  // Yellow
+        //     // Draw hit point if there is one
+        //     if let Some(hit) = hits.first() {
+        //         let hit_point = ray_pos + (ray_dir.as_vec3() * hit.time_of_impact);
+        //         gizmos.sphere(hit_point, Quat::IDENTITY, 0.1, Color::srgb(1.0, 1.0, 0.0));  // Yellow
                 
-                // Draw normal at hit point
-                let normal_end = hit_point + (hit.normal * 0.3);
-                gizmos.line(hit_point, normal_end, Color::srgb(0.0, 0.0, 1.0));  // Blue
-            }
-        } else {
-            gizmos.line(ray_pos, ray_end, Color::srgb(1.0, 0.0, 0.0));  // Red
-        }
+        //         // Draw normal at hit point
+        //         let normal_end = hit_point + (hit.normal * 0.3);
+        //         gizmos.line(hit_point, normal_end, Color::srgb(0.0, 0.0, 1.0));  // Blue
+        //     }
+        // } else {
+        //     gizmos.line(ray_pos, ray_end, Color::srgb(1.0, 0.0, 0.0));  // Red
+        // }
     }
 }
 

@@ -18,8 +18,8 @@ pub fn swimming_system(
             if protagonist.is_swimming {
                 protagonist.is_swimming = false;
                 protagonist.was_swimming = true;
-                ambient_light.color = Color::srgb(0.2, 0.2, 0.3);
-                ambient_light.brightness = 6000.0;
+                ambient_light.color = Color::srgb(0.1, 0.1, 0.3);
+                ambient_light.brightness = 100.0;
             }
         }
     }

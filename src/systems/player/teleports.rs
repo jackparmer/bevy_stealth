@@ -27,6 +27,8 @@ const GAME_START: Vec3 = Vec3::new(165.00298, 2.6249952, -150.00085);
 const OUTSIDE: Vec3 = Vec3::new(1102.4198, 2.6249733, -456.37585);
 const REACTOR: Vec3 = Vec3::new(-475.8837, 9.312412, -998.80884);
 
+const ICE_CAVE_POSITION: Vec3 = Vec3::new(-857.4748, -117.847946, 1850.5758);
+
 use crate::components::Protagonist;
 
 pub fn teleport_system(
@@ -41,10 +43,7 @@ pub fn teleport_system(
         let pos = Vec3::new(-455.44263, 3.0, 914.4542);
         Some((pos, "North Area"))
     } else if keyboard.just_pressed(KeyCode::Digit4) {
-        let mut pos = GEOTHERMAL_POSITION;
-        pos.y += GEOTHERMAL_BASE_HEIGHT / 2.0;
-        pos.x += GEOTHERMAL_BASE_RADIUS / 2.0;
-        Some((pos, "Geothermal"))
+        Some((ICE_CAVE_POSITION, "Ice Cave"))
     } else if keyboard.just_pressed(KeyCode::Digit5) {
         let mut pos = RADIO_TOWER_POSITION;
         pos.y += RADIO_TOWER_HEIGHT / 2.0 + 10.0;
