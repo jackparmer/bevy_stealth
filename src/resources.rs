@@ -4,14 +4,13 @@ use std::collections::HashMap;
 
 
 #[derive(Resource)]
-pub struct Animations {
+pub struct ProtagonistAnimations {
     pub animations: Vec<AnimationNodeIndex>,
-    #[allow(dead_code)]
     pub graph: Handle<AnimationGraph>,
 }
 
-// Define the global `scenes` variable
-pub static SCENES: Lazy<HashMap<&'static str, usize>> = Lazy::new(|| {
+// Define the global animations mapping
+pub static PROTAGONIST_ANIMATIONS: Lazy<HashMap<&'static str, usize>> = Lazy::new(|| {
     [
         ("STRAFE_JOG_RIGHT",0),
         ("ADVANCE", 1),

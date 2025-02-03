@@ -27,3 +27,12 @@ impl Default for Protagonist {
 
 #[derive(Component)]
 pub struct HighAltitudeIndicator;
+
+#[derive(Component)]
+pub struct Sentry {
+    pub view_distance: f32,
+    pub view_angle: f32,
+    pub follow_speed: f32,
+    pub velocity: Vec3,
+}
+

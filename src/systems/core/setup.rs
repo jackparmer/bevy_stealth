@@ -1,5 +1,5 @@
 use crate::components::Protagonist;
-use crate::resources::Animations;
+use crate::resources::ProtagonistAnimations;
 use crate::systems::environments::ladder::{spawn_ladder, LadderConfig};
 use crate::systems::environments::ice_cave::spawn_ice_cave;
 use crate::systems::environments::launch_silo::spawn_launch_silo;
@@ -66,24 +66,23 @@ pub fn setup(
     time: Res<Time>,
 ) {
 
-    // Build the animation graph
-    let mut graph = AnimationGraph::new();
+    // Protagonist animations
+    let mut protagonist_graph = AnimationGraph::new();
     const PROTAGONIST_ANIMATIONS: usize = 44;
-    let animations = graph
+    let protagonist_animations = protagonist_graph
         .add_clips(
             (0..=PROTAGONIST_ANIMATIONS)
                 .map(|i| GltfAssetLabel::Animation(i).from_asset("models/Protagonist.glb"))
-                .map(|path| asset_server.load(path)), // Map to load the asset
+                .map(|path| asset_server.load(path)),
             1.0,
-            graph.root,
+            protagonist_graph.root,
         )
         .collect();
 
-    // Insert a resource with the current scene information
-    let graph = graphs.add(graph);
-    commands.insert_resource(Animations {
-        animations,
-        graph: graph.clone(),
+    let protagonist_graph = graphs.add(protagonist_graph);
+    commands.insert_resource(ProtagonistAnimations {
+        animations: protagonist_animations,
+        graph: protagonist_graph.clone(),
     });
 
     // Add Camera and Ambient Lighting
@@ -274,7 +273,8 @@ pub fn setup(
                 .from_asset("models/Protagonist.glb")),
             transform: Transform::from_translation(PROTAGONIST_START.position),
             ..default()
-        },        
+        },
+        Name::new("Protagonist"),
     ));
 
     // Load the stars texture

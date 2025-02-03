@@ -1,5 +1,5 @@
 use crate::components::Protagonist;
-use crate::resources::{Animations, SCENES};
+use crate::resources::{ProtagonistAnimations, PROTAGONIST_ANIMATIONS};
 
 
 use bevy::{
@@ -18,7 +18,7 @@ pub fn keyboard_animation_control(
     mut angular_velocity_query: Query<&mut AngularVelocity, With<Protagonist>>,
     mut directional_light_query: Query<&mut DirectionalLight>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
-    animations: Res<Animations>,
+    animations: Res<ProtagonistAnimations>,
     mut current_animation: Local<usize>,
 ) {
 
@@ -100,7 +100,7 @@ pub fn keyboard_animation_control(
                 }
 
                 if movement != Vec3::ZERO {
-                    if let Some(swim) = SCENES.get("SWIM") {
+                    if let Some(swim) = PROTAGONIST_ANIMATIONS.get("SWIM") {
                         // Only start the swimming animation if we're not already playing it
                         if !player.is_playing_animation(animations.animations[*swim]) {
                             player.stop_all();  // Stop other animations first
@@ -120,7 +120,7 @@ pub fn keyboard_animation_control(
                     }
                 } else {
                     // Only start the tread animation if we're not already playing it
-                    if let Some(tread) = SCENES.get("TREAD") {
+                    if let Some(tread) = PROTAGONIST_ANIMATIONS.get("TREAD") {
                         if !player.is_playing_animation(animations.animations[*tread]) {
                             player.stop_all();  // Stop other animations first
                             transitions
@@ -148,7 +148,7 @@ pub fn keyboard_animation_control(
                !keyboard_input.pressed(KeyCode::KeyV) &&
                !keyboard_input.pressed(KeyCode::KeyB)
             {
-                if let Some(fly) = SCENES.get("FLY") {
+                if let Some(fly) = PROTAGONIST_ANIMATIONS.get("FLY") {
                     if !player.is_playing_animation(animations.animations[*fly]) {
                         transitions
                             .play(
@@ -207,7 +207,7 @@ pub fn keyboard_animation_control(
                             "STRAFE_RIGHT"
                         };
                         
-                        if let Some(strafe) = SCENES.get(strafe_anim) {
+                        if let Some(strafe) = PROTAGONIST_ANIMATIONS.get(strafe_anim) {
                             if !player.is_playing_animation(animations.animations[*strafe]) {
                                 let _animation = transitions
                                     .play(
@@ -236,7 +236,7 @@ pub fn keyboard_animation_control(
                             "STRAFE_LEFT"
                         };
                         
-                        if let Some(strafe) = SCENES.get(strafe_anim) {
+                        if let Some(strafe) = PROTAGONIST_ANIMATIONS.get(strafe_anim) {
                             if !player.is_playing_animation(animations.animations[*strafe]) {
                                 let _animation = transitions
                                     .play(
@@ -262,7 +262,7 @@ pub fn keyboard_animation_control(
                 }
 
                 if keyboard_input.pressed(KeyCode::KeyW) {
-                    if let Some(run) = SCENES.get("ADVANCE") {
+                    if let Some(run) = PROTAGONIST_ANIMATIONS.get("ADVANCE") {
                         if !player.is_playing_animation(animations.animations[*run]) {
                             let animation = transitions
                                 .play(
@@ -288,7 +288,7 @@ pub fn keyboard_animation_control(
                         }
                     }
                 } else if keyboard_input.pressed(KeyCode::KeyS) {
-                    if let Some(walk_backward) = SCENES.get("WALK_BACK") {
+                    if let Some(walk_backward) = PROTAGONIST_ANIMATIONS.get("WALK_BACK") {
                         if !player.is_playing_animation(animations.animations[*walk_backward]) {
                             let animation = transitions
                                 .play(
@@ -313,7 +313,7 @@ pub fn keyboard_animation_control(
                         }
                     }
                 } else if !keyboard_input.pressed(KeyCode::KeyW) && !keyboard_input.pressed(KeyCode::KeyS) {
-                    if let Some(idle) = SCENES.get("CROUCH") {
+                    if let Some(idle) = PROTAGONIST_ANIMATIONS.get("CROUCH") {
                         if !player.is_playing_animation(animations.animations[*idle]) {
                             transitions
                                 .play(
@@ -353,7 +353,7 @@ pub fn keyboard_animation_control(
                 && !protagonist.is_climbing
                 && !protagonist.is_falling  // Only jump if not already in the air
             {
-                if let Some(jump) = SCENES.get("JUMP") {
+                if let Some(jump) = PROTAGONIST_ANIMATIONS.get("JUMP") {
                     transitions
                         .play(
                             &mut player,
@@ -408,7 +408,7 @@ pub fn keyboard_animation_control(
             // Switch animations with Tab
             if keyboard_input.just_pressed(KeyCode::Tab) {
                 *current_animation = (*current_animation + 1) % animations.animations.len();
-                let key = SCENES
+                let key = PROTAGONIST_ANIMATIONS
                     .iter()
                     .find_map(|(k, &v)| if v == *current_animation { Some(k) } else { None });
                 println!(

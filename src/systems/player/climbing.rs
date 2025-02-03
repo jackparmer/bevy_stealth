@@ -6,7 +6,7 @@ use bevy::{
 };
 
 use crate::components::Protagonist;
-use crate::resources::{Animations, SCENES};
+use crate::resources::{ProtagonistAnimations, PROTAGONIST_ANIMATIONS};
 
 pub fn handle_climbing(
     mut collision_started: EventReader<CollisionStarted>,
@@ -63,7 +63,7 @@ pub fn climbing_keyboard_control(
     mut velocity_query: Query<(&mut LinearVelocity, &mut AngularVelocity), With<Protagonist>>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     mut camera_query: Query<&mut Transform, (With<Camera>, Without<Protagonist>)>,
-    animations: Res<Animations>,
+    animations: Res<ProtagonistAnimations>,
     time: Res<Time>,
 ) {
     let (protagonist_transform, mut protagonist) = match protagonist_query.get_single_mut() {
@@ -99,7 +99,7 @@ pub fn climbing_keyboard_control(
                                 else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 * speed_multiplier }
                                 else { 0.0 };
                 
-                if let Some(climb) = SCENES.get("CLIMB") {
+                if let Some(climb) = PROTAGONIST_ANIMATIONS.get("CLIMB") {
                     let anim_handle = animations.animations[*climb];
                     if climb_speed != 0.0 {
                         // Resume or start animation when moving

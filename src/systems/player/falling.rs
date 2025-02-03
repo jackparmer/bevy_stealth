@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::animation::RepeatAnimation;
 use avian3d::prelude::*;
 use crate::components::Protagonist;
-use crate::resources::{Animations, SCENES};
+use crate::resources::{ProtagonistAnimations, PROTAGONIST_ANIMATIONS};
 use std::time::Duration;
 
 pub fn check_falling(
@@ -88,13 +88,13 @@ pub fn handle_falling_animation(
     protagonist_query: Query<(&Protagonist, &Children)>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     _velocity_query: Query<&mut LinearVelocity>,
-    animations: Res<Animations>,
+    animations: Res<ProtagonistAnimations>,
 ) {
     for (protagonist, _) in protagonist_query.iter() {
         // Skip falling animation if driving
         if protagonist.is_falling && !protagonist.is_driving {
             for (mut player, mut transitions) in animation_players.iter_mut() {
-                if let Some(fly) = SCENES.get("FLY") {
+                if let Some(fly) = PROTAGONIST_ANIMATIONS.get("FLY") {
                     if !player.is_playing_animation(animations.animations[*fly]) {
                         transitions
                             .play(
