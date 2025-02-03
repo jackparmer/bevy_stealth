@@ -45,6 +45,9 @@ fn spawn_sentry_at(
     let fixed_position = Vec3::new(position.x, 3.0, position.z);
     println!("🤖 Spawning sentry...");
 
+    // 20% chance for red light
+    let is_red = rand::random::<f32>() < 0.2;
+
     commands.spawn((
         SceneBundle {       
             scene: asset_server
@@ -55,7 +58,7 @@ fn spawn_sentry_at(
             ..default()
         },
         RigidBody::Dynamic,
-        Collider::sphere(1.0),  // Simple sphere collider with radius 1.0
+        Collider::sphere(1.0),
         LockedAxes::new().lock_rotation_x().lock_rotation_z().lock_translation_y(),
         Friction::new(0.5),
         ExternalImpulse { impulse: Vec3::ZERO },
@@ -68,12 +71,16 @@ fn spawn_sentry_at(
         Name::new("Sentry"),
     ))
     .with_children(|parent| {
-        // Add point light as child
+        // Add point light as child with random color
         parent.spawn(PointLightBundle {
             point_light: PointLight {
                 intensity: 10000000.0,
                 range: 20.0,
-                color: Color::srgb(1.0, 0.8, 0.8),
+                color: if is_red {
+                    Color::srgb(1.0, 0.0, 0.0)  // Red light
+                } else {
+                    Color::srgb(1.0, 0.8, 0.8)  // Normal white-ish light
+                },
                 ..default()
             },
             transform: Transform::from_xyz(0.0, 6.0, 0.0),
@@ -114,9 +121,53 @@ pub fn sentry_follow_system(
         }
     };
 
+    // Collect sentry positions and entities for collision checking
+    let mut sentry_positions: Vec<(Entity, Vec3)> = Vec::new();
+    {
+        let sentry_query = query_set.p1();
+        for (entity, transform, _) in sentry_query.iter() {
+            sentry_positions.push((entity, transform.translation));
+        }
+    }
+
     // Get sentry query
     let mut sentry_query = query_set.p1();
     for (entity, mut transform, mut sentry) in sentry_query.iter_mut() {
+        // Check for collisions with other sentries
+        for &(other_entity, other_pos) in sentry_positions.iter() {
+            if entity != other_entity {
+                let distance_to_other = (transform.translation - other_pos).length();
+                if distance_to_other < 2.0 {  // Collision threshold
+                    // Trigger explosion for both sentries
+                    for &entity_to_explode in &[entity, other_entity] {
+                        commands.entity(entity_to_explode).insert(PendingImpulse(sentry.velocity * 50.0));
+                        commands.entity(entity_to_explode).despawn_recursive();
+                        
+                        // Spawn explosion effect
+                        commands.spawn((
+                            TransformBundle {
+                                local: transform.clone(),
+                                ..default()
+                            },
+                            SentryExplosion {
+                                timer: Timer::from_seconds(1.0, TimerMode::Once),
+                                initial_scale: transform.scale,
+                            },
+                        ));
+
+                        // Spawn explosion particles and light (reusing existing explosion code)
+                        spawn_explosion_effects(
+                            &mut commands,
+                            &mut meshes,
+                            &mut materials,
+                            transform.translation,
+                        );
+                    }
+                    return;  // Exit early since this sentry is now destroyed
+                }
+            }
+        }
+
         // Clamp Y position between 3.0 and 4.0
         transform.translation.y = transform.translation.y.clamp(3.0, 4.0);
         
@@ -231,6 +282,64 @@ pub fn sentry_follow_system(
             transform.look_at(look_target, Vec3::Y);
         }
     }
+}
+
+// Helper function to avoid code duplication
+fn spawn_explosion_effects(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    position: Vec3,
+) {
+    // Spawn particles
+    for i in 0..1000 {
+        let random_dir = Vec3::new(
+            rand::random::<f32>() * 2.0 - 1.0,
+            rand::random::<f32>() * 2.0 - 1.0,
+            rand::random::<f32>() * 2.0 - 1.0,
+        ).normalize();
+        
+        let speed = rand::random::<f32>() * 10.0 + 2.0;
+        let (base_color, emissive) = if i < 10 {
+            (Color::srgb(1.0, 0.0, 0.0), Color::srgb(2.0, 0.0, 0.0))
+        } else {
+            (Color::BLACK, Color::BLACK)
+        };
+        
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(Cuboid::new(0.2, 0.2, 0.2))),
+                material: materials.add(StandardMaterial {
+                    base_color,
+                    emissive: emissive.into(),
+                    ..default()
+                }),
+                transform: Transform::from_translation(position),
+                ..default()
+            },
+            ExplosionParticle {
+                velocity: random_dir * speed,
+                lifetime: Timer::from_seconds(1.0, TimerMode::Once),
+            },
+        ));
+    }
+
+    // Spawn explosion light
+    commands.spawn((
+        PointLightBundle {
+            point_light: PointLight {
+                intensity: 100000.0,
+                color: Color::rgb(1.0, 0.5, 0.0),
+                ..default()
+            },
+            transform: Transform::from_translation(position),
+            ..default()
+        },
+        ExplosionLight {
+            intensity: 100000.0,
+            timer: Timer::from_seconds(0.5, TimerMode::Once),
+        },
+    ));
 }
 
 pub fn sentry_explosion_system(
