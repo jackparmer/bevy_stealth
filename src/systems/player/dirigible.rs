@@ -104,9 +104,9 @@ pub fn dirigible_control(
     time: Res<Time>,
 ) {
     const VERTICAL_SPEED: f32 = 30.0;
-    const FORWARD_SPEED: f32 = 80.0;
+    const FORWARD_SPEED: f32 = 180.0;
     const TURN_SPEED: f32 = 2.0;
-    const ACCELERATION: f32 = 20.0;
+    const ACCELERATION: f32 = 40.0;
     const DECELERATION: f32 = 10.0;
     const SWAY_AMPLITUDE: f32 = 0.2;
     const SWAY_FREQUENCY: f32 = 0.5;

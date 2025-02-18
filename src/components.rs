@@ -9,6 +9,7 @@ pub struct Protagonist {
     pub was_swimming: bool,
     pub is_driving: bool,
     pub is_dirigible: bool,
+    pub is_outside: bool,
 }
 
 impl Default for Protagonist {
@@ -21,6 +22,7 @@ impl Default for Protagonist {
             was_swimming: false,
             is_driving: false,
             is_dirigible: false,
+            is_outside: true,
         }
     }
 }

@@ -40,11 +40,11 @@ pub const PERIMETER_WALL_HEIGHT: f32 = 5000.0;
 
 pub const ACQUIFIER_FLOOR_DEPTH: f32 = -1000.0;
 
-struct ProtagonistStart {
-    position: Vec3,
+pub struct ProtagonistStart {
+    pub position: Vec3,
 }
 
-const PROTAGONIST_START: ProtagonistStart = ProtagonistStart {
+pub const PROTAGONIST_START: ProtagonistStart = ProtagonistStart {
     position: Vec3::new(204.0, 3.0, -35.0),
 };
 
@@ -258,6 +258,7 @@ pub fn setup(
         ExternalImpulse::default(),
         LockedAxes::new().lock_rotation_x().lock_rotation_z(),
         Friction::new(0.5),
+        GravityScale(3.0),
         Protagonist { 
             is_climbing: false,
             was_climbing: false,
@@ -266,6 +267,7 @@ pub fn setup(
             was_swimming: false,
             is_driving: false,
             is_dirigible: false,
+            is_outside: false
         },
         SceneBundle {       
             scene: asset_server
@@ -474,5 +476,5 @@ pub fn setup(
 
     spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server);
 
-    spawn_reactor(&mut commands, &mut meshes, &mut materials, &asset_server, time);
+    spawn_reactor(&mut commands, &mut meshes, &mut materials, &asset_server);
 }

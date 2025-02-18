@@ -13,7 +13,7 @@ pub fn spawn_ice_cave(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     asset_server: &Res<AssetServer>,
 ) {
-    let sphere_pos = Vec3::new(-455.0 * 2.0, 1.6, 915.0 * 2.0);
+    let sphere_pos = Vec3::new(-485.0 * 2.0, 2.6249764, -1066.0 * 2.0);
     let radius = 400.0;
     let segments = 256; // Resolution of the sphere
     let noise_scale = 8.0; 

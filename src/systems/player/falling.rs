@@ -38,8 +38,9 @@ pub fn check_falling(
             overhead_filter
         );
 
-        // Adjust ambient light if there's something above
-        if !overhead_hits.is_empty() {
+        // Update is_outside status and adjust ambient light based on overhead hits
+        protagonist.is_outside = overhead_hits.is_empty();
+        if !protagonist.is_outside {
             ambient_light.brightness = 2000.0; // Reduced brightness when under cover
         } else {
             ambient_light.brightness = 6000.0; // Normal brightness in open areas
