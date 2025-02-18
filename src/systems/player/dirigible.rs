@@ -103,33 +103,44 @@ pub fn dirigible_control(
     mut angular_velocity_query: Query<&mut AngularVelocity, With<Protagonist>>,
     time: Res<Time>,
 ) {
-    const VERTICAL_SPEED: f32 = 30.0;
-    const FORWARD_SPEED: f32 = 180.0;
-    const TURN_SPEED: f32 = 2.0;
-    const ACCELERATION: f32 = 40.0;
-    const DECELERATION: f32 = 10.0;
-    const SWAY_AMPLITUDE: f32 = 0.2;
-    const SWAY_FREQUENCY: f32 = 0.5;
+    const VERTICAL_SPEED: f32 = 600.0;
+    const FORWARD_SPEED: f32 = 1020.0;
+    const TURN_SPEED: f32 = 1.2;
+    const ACCELERATION: f32 = 15.0;     // Reduced further for more stability
+    const DECELERATION: f32 = 8.0;      // Increased for better stopping
+    const SWAY_AMPLITUDE: f32 = 0.1;    // Reduced sway
+    const SWAY_FREQUENCY: f32 = 0.2;    // Slower sway
+    const DAMPENING: f32 = 0.95;        // New dampening factor
 
     if let Ok((mut transform, protagonist)) = protagonist_query.get_single_mut() {
         if !protagonist.is_dirigible {
             return;
         }
 
-        // Handle turning with A/D keys (corrected direction)
+        // Handle turning with A/D keys with smooth interpolation
         if let Ok(mut angular_velocity) = angular_velocity_query.get_single_mut() {
-            if keyboard_input.pressed(KeyCode::KeyD) {
-                angular_velocity.0 = Vec3::new(0.0, -TURN_SPEED, 0.0);
+            let target_turn = if keyboard_input.pressed(KeyCode::KeyD) {
+                Vec3::new(0.0, -TURN_SPEED, 0.0)
             } else if keyboard_input.pressed(KeyCode::KeyA) {
-                angular_velocity.0 = Vec3::new(0.0, TURN_SPEED, 0.0);
+                Vec3::new(0.0, TURN_SPEED, 0.0)
             } else {
-                angular_velocity.0 = Vec3::ZERO;
-            }
+                Vec3::ZERO
+            };
+            
+            // Apply dampening to current angular velocity
+            angular_velocity.0 *= DAMPENING;
+            
+            // Smooth angular velocity changes
+            angular_velocity.0 = Vec3::lerp(
+                angular_velocity.0,
+                target_turn,
+                ACCELERATION * time.delta_seconds()
+            );
         }
 
-        // Add gentle sway
+        // Add gentle sway with dampening
         let sway = SWAY_AMPLITUDE * (time.elapsed_seconds() * SWAY_FREQUENCY).sin();
-        transform.rotate_local_z(sway * time.delta_seconds());
+        transform.rotate_local_z(sway * time.delta_seconds() * DAMPENING);
 
         // Position clamping
         let pos = transform.translation;
@@ -159,6 +170,9 @@ pub fn dirigible_control(
             movement -= transform.forward() * FORWARD_SPEED;
         }
 
+        // Apply dampening to current velocity before adding new movement
+        velocity.0 *= DAMPENING;
+
         velocity.0 = if movement != Vec3::ZERO {
             Vec3::lerp(
                 velocity.0,
@@ -173,10 +187,11 @@ pub fn dirigible_control(
             )
         };
 
+        // Tighter velocity clamping
         velocity.0 = Vec3::new(
-            velocity.0.x.clamp(-80.0, 80.0),
-            velocity.0.y.clamp(-60.0, 60.0),
-            velocity.0.z.clamp(-80.0, 80.0)
+            velocity.0.x.clamp(-50.0, 50.0),
+            velocity.0.y.clamp(-30.0, 30.0),
+            velocity.0.z.clamp(-50.0, 50.0)
         );
     }
 }

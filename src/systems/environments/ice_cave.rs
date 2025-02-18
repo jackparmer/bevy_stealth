@@ -15,25 +15,23 @@ pub fn spawn_ice_cave(
 ) {
     let sphere_pos = Vec3::new(-485.0 * 2.0, 2.6249764, -1066.0 * 2.0);
     let radius = 400.0;
-    let segments = 256; // Resolution of the sphere
-    let noise_scale = 8.0; 
-    let noise_amplitude = 200.0; 
-    let opening_size = 0.5; // Size of the hole (0.0 to 1.0)
-    let cube_size = 40.0;
+    let segments = 128; // Reduced from 256 for better performance while maintaining good visual quality
+    let noise_scale = 8.0;
+    let noise_amplitude = 200.0;
+    let opening_size = 0.5;
+    let cube_size = 80.0;
 
-    let perlin = Perlin::new(42); // Seed of 42
+    let perlin = Perlin::new(42);
 
-    // Generate vertices and indices for the sphere
-    let mut vertices: Vec<Vec3> = Vec::new();
-    let mut indices: Vec<u32> = Vec::new();
-    let mut normals: Vec<Vec3> = Vec::new();
-    let mut uvs: Vec<[f32; 2]> = Vec::new();
-
-    // Generate vertices
-    let mut vertex_count = 0;
+    // Pre-allocate vectors with capacity
+    let estimated_vertex_count = (segments + 1) * (segments + 1);
+    let mut vertices = Vec::with_capacity(estimated_vertex_count);
+    let mut normals = Vec::with_capacity(estimated_vertex_count);
+    let mut uvs = Vec::with_capacity(estimated_vertex_count);
     let mut vertex_map = vec![vec![-1i32; segments as usize + 1]; segments as usize + 1];
 
     // Generate vertices
+    let mut vertex_count = 0;
     for lat in 0..=segments {
         for lon in 0..=segments {
             let theta = (lat as f32 * PI) / segments as f32;
@@ -73,6 +71,10 @@ pub fn spawn_ice_cave(
             vertex_count += 1;
         }
     }
+
+    // Pre-allocate indices vector with estimated capacity
+    let estimated_index_count = segments as usize * segments as usize * 6;
+    let mut indices = Vec::with_capacity(estimated_index_count);
 
     // Generate indices
     for lat in 0..segments {
@@ -133,7 +135,6 @@ pub fn spawn_ice_cave(
         RigidBody::Static,
     ));
 
-
     // Generate vertices for cube positions (but don't create the sphere mesh)
     let mut vertices: Vec<Vec3> = Vec::new();
     
@@ -169,9 +170,10 @@ pub fn spawn_ice_cave(
         }
     }
 
-    // Spawn cubes
+    // Spawn cubes more efficiently
+    let cube_spawn_interval = 12; // Increased from 6 to spawn fewer cubes
     for (i, vertex) in vertices.iter().enumerate() {
-        if i % 6 != 0 {
+        if i % cube_spawn_interval != 0 {
             continue;
         }
 
@@ -224,39 +226,13 @@ pub fn spawn_ice_cave(
         });
     }
 
-    // Add ring of spotlights around interior perimeter with water basins
-    let num_lights = 1;
-    let ring_radius = 70.0;
-    let light_height = 1.0;
-    
-    for i in 0..num_lights {
-        let angle = (i as f32 / num_lights as f32) * 2.0 * PI;
-        let x = angle.cos() * ring_radius;
-        let z = angle.sin() * ring_radius;
-        let light_pos = sphere_pos + Vec3::new(x, light_height, z);
-        
-        // Spawn spotlight pointing sideways (tangent to the circle)
-        commands.spawn(SpotLightBundle {
-            spot_light: SpotLight {
-                intensity: 10000.0,
-                color: Color::srgb(0.1, 0.5, 1.0),
-                shadows_enabled: true,
-                outer_angle: 1.2,
-                inner_angle: 0.8,
-                range: 200.0,
-                radius: 8.0,
-                ..default()
-            },
-            transform: Transform::from_translation(light_pos)
-                .looking_to(Vec3::new(-z, 0.0, x).normalize(), Vec3::Y),
-            ..default()
-        });
-
-        // Spawn water basin at each spotlight location
-        spawn_water_feature(commands, meshes, materials, light_pos);
-    }
-
-    // Remove the original water feature spawn call since it's now handled in the loop
+    // Spawn water feature at a position relative to the cave entrance
+    let water_feature_pos = sphere_pos + Vec3::new(
+        radius * 0.3, // Slightly offset from center
+        -radius * 0.4, // Lower in the cave
+        radius * 0.7, // Towards the entrance
+    );
+    spawn_water_feature(commands, meshes, materials, water_feature_pos);
 }
 
 pub fn spawn_water_feature(

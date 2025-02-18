@@ -20,12 +20,15 @@ use systems::player::swimming::swimming_system;
 use systems::player::driving::{toggle_driving, driving_control};
 use systems::player::teleports::teleport_system;
 use systems::player::falling;
+use systems::player::dirigible::{toggle_dirigible, dirigible_control, animate_floating_balloon};
 
 use systems::environments::portal::portal_system;
 use systems::environments::terrain::{spawn_terrain, toggle_terrain_texture};
 use systems::environments::airlock::{spawn_airlock, handle_airlock_teleport, blink_airlock_light};
 use systems::environments::tram::move_tram;
 use systems::environments::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
+use systems::environments::maze::spawn_maze;
+
 use systems::core::sentry::{
     spawn_sentry,
     sentry_follow_system,
@@ -60,6 +63,7 @@ fn main() {
             setup_explosion_materials,
             spawn_sentry,
         ).chain())
+        .add_systems(Startup, spawn_maze)
         .add_systems(Startup, spawn_terrain)
         .add_systems(Startup, spawn_airlock)
         .add_systems(Update, handle_airlock_teleport)
@@ -67,6 +71,9 @@ fn main() {
         .add_systems(Update, toggle_terrain_texture)
         .add_systems(Update, toggle_driving)
         .add_systems(Update, driving_control)
+        .add_systems(Update, toggle_dirigible)
+        .add_systems(Update, dirigible_control)
+        .add_systems(Update, animate_floating_balloon)
         .add_systems(Update, move_tram)
         .add_systems(Update, animate_light_direction)
         .add_systems(Update, rotate_camera)

@@ -208,8 +208,13 @@ fn spawn_sentry_at(
         },
         Name::new("Sentry"),
         SentryTiming {
-            time_offset: rand::random::<f32>() * 100.0, // Random phase offset
+            time_offset: rand::random::<f32>() * 100.0,
         },
+        RigidBody::Dynamic,
+        Collider::sphere(1.0),  // Adjusted to be a cube instead of sphere
+        ExternalImpulse::default(),
+        Friction::new(0.5),
+        GravityScale(3.0),
     )).with_children(|parent| {
         // Top siren light (subtle pulsing)
         parent.spawn((
@@ -282,7 +287,7 @@ pub fn sentry_follow_system(
     mut commands: Commands,
     mut query_set: ParamSet<(
         Query<(&Transform, &Protagonist), With<Protagonist>>,
-        Query<(Entity, &mut Transform, &mut Sentry, Option<&Collider>, &SentryTiming)>,
+        Query<(Entity, &mut Transform, &mut Sentry, &SentryTiming)>,
     )>,
     time: Res<Time>,
     explosion_materials: Res<ExplosionMaterials>,
@@ -304,32 +309,19 @@ pub fn sentry_follow_system(
     let mut sentry_positions: Vec<(Entity, Vec3)> = Vec::new();
     {
         let sentry_query = query_set.p1();
-        for (entity, transform, _, _, _) in sentry_query.iter() {
+        for (entity, transform, _, _) in sentry_query.iter() {
             sentry_positions.push((entity, transform.translation));
         }
     }
 
     // Get sentry query
     let mut sentry_query = query_set.p1();
-    for (entity, mut transform, mut sentry, collider, timing) in sentry_query.iter_mut() {
-        // Update collider based on driving state
-        if is_driving {
-            // Remove collider when protagonist is driving
-            if collider.is_some() {
-                commands.entity(entity).remove::<Collider>();
-            }
-        } else {
-            // Add collider when protagonist is not driving
-            if collider.is_none() {
-                commands.entity(entity).insert(Collider::sphere(1.0));
-            }
-        }
-
-        // Check for collisions with other sentries
+    for (entity, mut transform, mut sentry, timing) in sentry_query.iter_mut() {
+        // Check for collisions with other sentries using sphere approximation
         for &(other_entity, other_pos) in sentry_positions.iter() {
             if entity != other_entity {
                 let distance_to_other = (transform.translation - other_pos).length();
-                if distance_to_other < 2.0 {  // Collision threshold
+                if distance_to_other < 3.0 {  // Collision threshold for combined sphere radii (1.5 + 1.5)
                     // Trigger explosion for both sentries
                     for &entity_to_explode in &[entity, other_entity] {
                         commands.entity(entity_to_explode).despawn_recursive();
@@ -362,9 +354,6 @@ pub fn sentry_follow_system(
             }
         }
 
-        // Clamp Y position between 3.0 and 4.0
-        transform.translation.y = transform.translation.y.clamp(3.0, 4.0);
-        
         let individual_time = time.elapsed_seconds() + timing.time_offset;
         let direction = protagonist_pos - transform.translation;
         let distance = direction.length();
@@ -409,15 +398,20 @@ pub fn sentry_follow_system(
                 strafe_offset * distance_factor
             ) * time.delta_seconds();
             
-            // Ignore Y movement to keep sentry at constant height
-            let movement = Vec3::new(movement.x, 0.0, movement.z);
+            // Allow Y movement but dampen it slightly
+            let movement = Vec3::new(
+                movement.x,
+                movement.y * 0.7, // Dampen vertical movement
+                movement.z
+            );
             
             sentry.velocity = movement / time.delta_seconds();
             transform.translation += movement;
 
-            // Look at target but only rotate around Y axis
-            let direction_xz = Vec3::new(direction.x, 0.0, direction.z).normalize();
-            transform.rotation = Quat::from_rotation_y(direction_xz.z.atan2(direction_xz.x));
+            // Look at target with full 3D rotation
+            if direction.length_squared() > 0.001 {
+                transform.look_at(protagonist_pos, Vec3::Y);
+            }
             
             // Trigger explosion at closer range
             if distance < 2.0 {  // Increased explosion trigger distance
@@ -621,10 +615,14 @@ pub fn periodic_sentry_spawn(
                 let angle = rand::random::<f32>() * PI / 1.5 - PI / 3.0; // -60° to +60°
                 let distance = 80.0 + rand::random::<f32>() * 120.0; // 80-200 units away
                 
-                // Calculate spawn position in front arc
+                // Calculate spawn position in front arc, but keep Y at ground level
                 let rotation = Quat::from_rotation_y(angle);
                 let spawn_direction = rotation * forward;
-                let spawn_pos = protagonist_transform.translation + spawn_direction * distance;
+                let spawn_pos = Vec3::new(
+                    protagonist_transform.translation.x + spawn_direction.x * distance,
+                    3.0, // Fixed ground level height
+                    protagonist_transform.translation.z + spawn_direction.z * distance,
+                );
                 
                 if spawn_sentry_at(&mut commands, &asset_server, &mut meshes, spawn_pos, &explosion_materials, &minimap_resources, &spatial_query) {
                     break; // Successfully spawned

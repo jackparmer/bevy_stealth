@@ -50,9 +50,9 @@ pub fn keyboard_animation_control(
                 // Handle underwater movement
                 let mut movement = Vec3::ZERO;
                 let swimming_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                    underwater_speed * 6.0  // Tripled from 2.0
+                    underwater_speed * 20.0
                 } else {
-                    underwater_speed * 3.0  // Tripled from 1.0
+                    underwater_speed * 10.0  
                 };
                 
                 // Forward/Backward movement

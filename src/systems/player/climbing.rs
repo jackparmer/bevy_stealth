@@ -71,6 +71,13 @@ pub fn climbing_keyboard_control(
         Err(_) => return,
     };
 
+    // Add space key detection to stop climbing
+    if protagonist.is_climbing && keyboard_input.just_pressed(KeyCode::Space) {
+        protagonist.is_climbing = false;
+        protagonist.was_climbing = true;
+        return;  // Exit early since we're no longer climbing
+    }
+
     if protagonist.is_climbing {
         protagonist.is_falling = false;
 

@@ -23,6 +23,8 @@ use crate::systems::environments::ladder::{
 
 use crate::systems::environments::reactor::{CYLINDER_HEIGHT, WALL_THICKNESS};
 
+use crate::systems::environments::maze::{MAZE_POSITION, CELL_SIZE};
+
 const AIRLOCK_POSITION: Vec3 = Vec3::new(779.1837, 2.6249955, -423.27768);
 const GAME_START: Vec3 = Vec3::new(165.00298, 2.6249952, -150.00085);
 
@@ -30,6 +32,12 @@ const OUTSIDE: Vec3 = Vec3::new(1102.4198, 2.6249733, -456.37585);
 const REACTOR: Vec3 = Vec3::new(-910.0, 1.6, 1830.0);
 
 const ICE_CAVE_POSITION: Vec3 = Vec3::new(-857.4748, -117.847946, 1850.5758);
+
+static MAZE_START: Vec3 = Vec3::new(
+    2700.0 + CELL_SIZE,
+    2.625,
+    2200.0 + CELL_SIZE
+);
 
 use crate::components::Protagonist;
 
@@ -71,6 +79,8 @@ pub fn teleport_system(
         let mut pos = REACTOR;
         pos.y += CYLINDER_HEIGHT/2.0 + WALL_THICKNESS;
         Some((pos, "Reactor Top"))
+    } else if keyboard.just_pressed(KeyCode::KeyM) {
+        Some((MAZE_START, "Maze"))
     } else {
         None
     };
