@@ -176,3 +176,31 @@ pub fn check_ladder_presence(
         }
     }
 }
+
+pub fn handle_ladder_top(
+    mut collision_started: EventReader<CollisionStarted>,
+    mut protagonist_query: Query<(&mut Transform, &mut Protagonist)>,
+    name_query: Query<&Name>,
+) {
+    for collision in collision_started.read() {
+        if let Ok((mut transform, mut protagonist)) = protagonist_query.get_mut(collision.0) {
+            if name_query.get(collision.1).map_or(false, |name| name.as_str() == "LadderTopSensor") {
+                if protagonist.is_climbing {
+                    let forward = transform.forward().as_vec3();
+                    transform.translation.y += 2.0;
+                    transform.translation += forward * 2.0;
+                    protagonist.is_climbing = false;
+                }
+            }
+        } else if let Ok((mut transform, mut protagonist)) = protagonist_query.get_mut(collision.1) {
+            if name_query.get(collision.0).map_or(false, |name| name.as_str() == "LadderTopSensor") {
+                if protagonist.is_climbing {
+                    let forward = transform.forward().as_vec3();
+                    transform.translation.y += 2.0;
+                    transform.translation += forward * 2.0;
+                    protagonist.is_climbing = false;
+                }
+            }
+        }
+    }
+}

@@ -88,7 +88,7 @@ pub fn animate_light_cones(
     mut query: Query<(&mut Transform, &mut LightConeAnimation, &mut Handle<StandardMaterial>, &Parent, &GlobalTransform)>,
     timing_query: Query<&SentryTiming>,
 ) {
-    for (mut transform, mut anim, mut material_handle, parent, global_transform) in query.iter_mut() {
+    for (mut transform, mut anim, mut material_handle, parent, _) in query.iter_mut() {
         let time_offset = timing_query.get(parent.get()).map_or(0.0, |timing| timing.time_offset);
         let individual_time = time.elapsed_seconds() + time_offset;
         
@@ -112,7 +112,7 @@ pub fn animate_light_cones(
                     0.9 * intensity_factor,
                     0.0,
                     0.0,
-                    0.9 * intensity_factor
+                    0.3 * intensity_factor // More transparent
                 );
                 material.emissive = Color::srgb(
                     1.0 * intensity_factor,
@@ -124,7 +124,7 @@ pub fn animate_light_cones(
                     0.0,
                     0.0,
                     0.3 * intensity_factor,
-                    0.8 * intensity_factor
+                    0.2 * intensity_factor // More transparent
                 );
                 material.emissive = Color::srgb(
                     0.0,
@@ -134,29 +134,9 @@ pub fn animate_light_cones(
             }
         }
         
-        let is_ground_disc = transform.translation.y < 0.0;
-        
-        if is_ground_disc {
-            let ground_pulse = (individual_time * 1.5).sin() * 0.8;
-            let ground_scale = 1.0 + ground_pulse.abs();
-            transform.scale = Vec3::new(
-                anim.base_scale.x * ground_scale,
-                anim.base_scale.y * ground_scale,
-                anim.base_scale.z * ground_scale
-            );
-            
-            // Keep disc directly under sentry
-            transform.translation = Vec3::new(0.0, -0.4, 0.0);
-            transform.rotation = Quat::IDENTITY * Quat::from_rotation_x(-PI / 2.0);
-        } else {
-            let pulse = (individual_time * 1.5).sin() * 0.3;
-            let radius_scale = 1.0 + pulse.abs();
-            transform.scale = Vec3::new(
-                anim.base_scale.x * radius_scale,
-                anim.base_scale.y,  // Height stays constant
-                anim.base_scale.z * radius_scale
-            );
-        }
+        let pulse = (individual_time * 1.5).sin() * 0.3;
+        let scale = 1.0 + pulse.abs();
+        transform.scale = Vec3::splat(anim.base_scale.x * scale);
     }
 }
 
@@ -169,16 +149,33 @@ fn spawn_sentry_at(
     materials: &ExplosionMaterials,
     minimap_resources: &Res<MinimapResources>,
     spatial_query: &SpatialQuery,
-) -> bool {  // Return bool to indicate if spawn was successful
-    // Cast a ray up and down to check if position is inside a building
-    let ray_pos = position + Vec3::new(0.0, 0.5, 0.0);
-    let ray_dir = Dir3::Y;
-    let max_distance = 2000.0;
+) -> bool {
+    // Cast a ray down to find the ground position
+    let ray_start = position + Vec3::new(0.0, 10.0, 0.0); // Start higher to ensure we find ground
+    let ray_dir = Dir3::NEG_Y;
+    let max_distance = 20.0;
     let filter = SpatialQueryFilter::default();
     
-    let overhead_hits = spatial_query.ray_hits(
-        ray_pos,
+    let ground_hit = spatial_query.ray_hits(
+        ray_start,
         ray_dir,
+        max_distance,
+        1,
+        true,
+        filter.clone()  // Clone the filter here
+    ).first().copied();
+
+    // If we don't find ground, don't spawn
+    let ground_position = if let Some(hit) = ground_hit {
+        ray_start + Vec3::NEG_Y * hit.time_of_impact
+    } else {
+        return false;
+    };
+
+    // Cast a ray up to check if position is inside a building
+    let overhead_hits = spatial_query.ray_hits(
+        ground_position + Vec3::new(0.0, 0.5, 0.0),
+        Dir3::Y,
         max_distance,
         1,
         true,
@@ -187,7 +184,7 @@ fn spawn_sentry_at(
 
     // If we have hits above, we're indoors
     if !overhead_hits.is_empty() {
-        return false; // Don't spawn if inside
+        return false;
     }
 
     let sentry_entity = commands.spawn((
@@ -195,7 +192,7 @@ fn spawn_sentry_at(
             scene: asset_server
                 .load(GltfAssetLabel::Scene(0)
                 .from_asset("models/tmpn3hy22ev.glb")),
-            transform: Transform::from_translation(position)
+            transform: Transform::from_translation(ground_position)
                 .with_scale(Vec3::splat(1.0)),
             ..default()
         },
@@ -210,60 +207,42 @@ fn spawn_sentry_at(
         SentryTiming {
             time_offset: rand::random::<f32>() * 100.0,
         },
-        RigidBody::Dynamic,
-        Collider::sphere(1.0),  // Adjusted to be a cube instead of sphere
-        ExternalImpulse::default(),
-        Friction::new(0.5),
-        GravityScale(3.0),
     )).with_children(|parent| {
-        // Top siren light (subtle pulsing)
+        // Sphere light (pulsing)
         parent.spawn((
             PbrBundle {
                 mesh: materials.glow_cone_mesh.clone(),
                 material: materials.glow_cone_red_material.clone(),
-                transform: Transform::from_xyz(0.0, 0.8, 0.0)
-                    .with_scale(Vec3::new(2.0, 1.0, 2.0)),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0) // Center on sentry
+                    .with_scale(Vec3::splat(3.0)), // Adjust size to envelope sentry
                 ..default()
             },
             LightConeAnimation {
                 timer: Timer::from_seconds(1.0, TimerMode::Repeating),
-                base_scale: Vec3::new(2.0, 1.0, 2.0),
-                is_red: true,
-                color_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
-            },
-        ));
-        
-        // Ground disc (dramatic pulsing)
-        parent.spawn((
-            PbrBundle {
-                mesh: meshes.add(Mesh::from(Circle::new(2.0))),
-                material: materials.glow_cone_red_material.clone(),
-                transform: Transform::from_xyz(0.0, -0.4, 0.0)
-                    .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
-                ..default()
-            },
-            LightConeAnimation {
-                timer: Timer::from_seconds(1.0, TimerMode::Repeating),
-                base_scale: Vec3::new(1.0, 1.0, 1.0),
+                base_scale: Vec3::splat(3.0), // Base scale for sphere
                 is_red: true,
                 color_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
             },
         ));
     }).id();
 
-    // Spawn minimap marker for the sentry
+    // Update minimap marker to use ground position
     commands.spawn((
         PbrBundle {
             mesh: minimap_resources.sentry_mesh.clone(),
             material: minimap_resources.sentry_material.clone(),
-            transform: Transform::from_xyz(position.x, MINIMAP_MARKER_HEIGHT, position.z),
+            transform: Transform::from_xyz(
+                ground_position.x,
+                MINIMAP_MARKER_HEIGHT,
+                ground_position.z
+            ),
             ..default()
         },
         MinimapMarker,
         SentryMinimapMarker(sentry_entity),
     ));
 
-    true // Spawn successful
+    true
 }
 
 // System function for initial spawn
@@ -294,6 +273,7 @@ pub fn sentry_follow_system(
     mut explosion_counter: ResMut<ExplosionCounter>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
+    spatial_query: SpatialQuery,
 ) {
     // Get protagonist data first
     let (protagonist_pos, is_driving) = {
@@ -317,11 +297,11 @@ pub fn sentry_follow_system(
     // Get sentry query
     let mut sentry_query = query_set.p1();
     for (entity, mut transform, mut sentry, timing) in sentry_query.iter_mut() {
-        // Check for collisions with other sentries using sphere approximation
+        // Check for collisions with other sentries
         for &(other_entity, other_pos) in sentry_positions.iter() {
             if entity != other_entity {
                 let distance_to_other = (transform.translation - other_pos).length();
-                if distance_to_other < 3.0 {  // Collision threshold for combined sphere radii (1.5 + 1.5)
+                if distance_to_other < 3.0 {
                     // Trigger explosion for both sentries
                     for &entity_to_explode in &[entity, other_entity] {
                         commands.entity(entity_to_explode).despawn_recursive();
@@ -334,7 +314,7 @@ pub fn sentry_follow_system(
                             SentryExplosion {
                                 timer: Timer::from_seconds(1.0, TimerMode::Once),
                                 initial_scale: transform.scale * if is_driving { 3.0 } else { 1.0 },
-                                start_time: time.elapsed_seconds(),  // Add start time
+                                start_time: time.elapsed_seconds(),
                             },
                         ));
 
@@ -349,7 +329,7 @@ pub fn sentry_follow_system(
                             &time,
                         );
                     }
-                    return;  // Exit early since this sentry is now destroyed
+                    return;
                 }
             }
         }
@@ -359,65 +339,21 @@ pub fn sentry_follow_system(
         let distance = direction.length();
 
         if distance < sentry.view_distance {
-            let direction = direction.normalize();
-            
-            // More erratic and unsettling movement
-            let horror_offset = Vec3::new(
-                (individual_time * 3.0).sin() * 2.0 + (individual_time * 7.0).cos() * 1.0,
-                (individual_time * 4.0).cos() * 0.5 + (individual_time * 2.0).sin() * 0.3,
-                (individual_time * 3.5).sin() * 2.0 + (individual_time * 6.0).cos() * 1.0
-            );
-
-            // More frequent and intense sudden movements
-            let sudden_movement = if (individual_time * 0.5).sin() > 0.8 {
-                let intensity = (individual_time * 0.5).sin().powf(2.0) * 3.0;
-                Vec3::new(
-                    rand::random::<f32>() * intensity - intensity/2.0,
-                    rand::random::<f32>() * intensity/2.0,
-                    rand::random::<f32>() * intensity - intensity/2.0
-                )
-            } else {
-                Vec3::ZERO
-            };
-
-            // Add circular strafing behavior
-            let strafe_radius = 5.0;
-            let strafe_speed = 2.0;
-            let strafe_offset = Vec3::new(
-                (individual_time * strafe_speed).cos() * strafe_radius,
-                0.0,
-                (individual_time * strafe_speed).sin() * strafe_radius
-            );
-
-            // Combine all movement components with distance-based intensity
-            let distance_factor = (1.0 - (distance / sentry.view_distance)).powf(0.5);
-            let movement = (
-                direction * sentry.follow_speed + 
-                horror_offset * distance_factor * 1.5 + 
-                sudden_movement * distance_factor + 
-                strafe_offset * distance_factor
-            ) * time.delta_seconds();
-            
-            // Allow Y movement but dampen it slightly
-            let movement = Vec3::new(
-                movement.x,
-                movement.y * 0.7, // Dampen vertical movement
-                movement.z
-            );
-            
-            sentry.velocity = movement / time.delta_seconds();
+            // Simple direct movement
+            let movement = direction.normalize() * sentry.follow_speed * time.delta_seconds();
             transform.translation += movement;
 
-            // Look at target with full 3D rotation
+            // Update rotation with wobble effect
             if direction.length_squared() > 0.001 {
+                let wobble = Quat::from_rotation_z((individual_time * 8.0).sin() * 0.15);
                 transform.look_at(protagonist_pos, Vec3::Y);
+                transform.rotation *= wobble;
             }
             
             // Trigger explosion at closer range
-            if distance < 2.0 {  // Increased explosion trigger distance
+            if distance < 2.0 {
                 commands.entity(entity).despawn_recursive();
                 
-                // Spawn drone carcass at explosion location
                 commands.spawn(SceneBundle {
                     scene: asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/drone_carcass.glb")),
                     transform: transform.clone(),
@@ -432,7 +368,7 @@ pub fn sentry_follow_system(
                     SentryExplosion {
                         timer: Timer::from_seconds(1.0, TimerMode::Once),
                         initial_scale: transform.scale * if is_driving { 3.0 } else { 1.0 },
-                        start_time: time.elapsed_seconds(),  // Add start time
+                        start_time: time.elapsed_seconds(),
                     },
                 ));
 
@@ -457,10 +393,8 @@ pub fn setup_explosion_materials(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let siren_shape = Mesh::from(Cylinder {
-        radius: 0.05,
-        half_height: 0.025, 
-    });
+    // Replace siren_shape with sphere
+    let siren_shape = Mesh::from(Sphere { radius: 1.0 });
 
     let materials = ExplosionMaterials {
         particle_mesh: meshes.add(Mesh::from(Cuboid::new(0.2, 0.2, 0.2))),
@@ -476,15 +410,17 @@ pub fn setup_explosion_materials(
         }),
         glow_cone_mesh: meshes.add(siren_shape),
         glow_cone_red_material: materials.add(StandardMaterial {
-            base_color: Color::srgba(0.9, 0.0, 0.2, 0.9),
+            base_color: Color::srgba(0.9, 0.0, 0.2, 0.3), // More transparent
             emissive: Color::srgb(1.0, 0.0, 0.2).into(),
             alpha_mode: AlphaMode::Blend,
+            double_sided: true, // Add this for sphere visibility
             ..default()
         }),
         glow_cone_blue_material: materials.add(StandardMaterial {
-            base_color: Color::srgba(0.1, 0.0, 0.3, 0.8),  // Darker blue
-            emissive: Color::srgb(0.2, 0.0, 0.8).into(),  // Subtle glow
+            base_color: Color::srgba(0.1, 0.0, 0.3, 0.2), // More transparent
+            emissive: Color::srgb(0.2, 0.0, 0.8).into(),
             alpha_mode: AlphaMode::Blend,
+            double_sided: true, // Add this for sphere visibility
             ..default()
         }),
     };

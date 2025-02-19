@@ -15,7 +15,7 @@ use systems::core::input::keyboard_animation_control;
 use systems::core::timer::{setup_debug_timer, print_protagonist_transform};
 use systems::core::minimap::{setup_minimap, update_minimap, update_sentry_markers};
 
-use systems::player::climbing::{handle_climbing, climbing_keyboard_control, check_ladder_presence};
+use systems::player::climbing::{handle_climbing, climbing_keyboard_control, check_ladder_presence, handle_ladder_top};
 use systems::player::swimming::swimming_system;
 use systems::player::driving::{toggle_driving, driving_control};
 use systems::player::teleports::teleport_system;
@@ -88,6 +88,7 @@ fn main() {
         ))
         .add_systems(Update, portal_system)      
         .add_systems(Update, handle_climbing)
+        .add_systems(Update, handle_ladder_top)
         .add_systems(Update, check_ladder_presence.after(handle_climbing))
         .add_systems(Update, climbing_keyboard_control)
         .add_systems(Update, swimming_system)

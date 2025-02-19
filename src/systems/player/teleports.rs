@@ -1,13 +1,11 @@
 use bevy::prelude::*;
 use crate::systems::core::setup::{
-    GEOTHERMAL_POSITION,
     RADIO_TOWER_POSITION,
     TRAM_POSITION,
     // Heights
     GEOTHERMAL_BASE_HEIGHT,
     RADIO_TOWER_HEIGHT,
     // Widths
-    GEOTHERMAL_BASE_RADIUS,
     RADIO_TOWER_WIDTH,
 };
 
@@ -23,7 +21,11 @@ use crate::systems::environments::ladder::{
 
 use crate::systems::environments::reactor::{CYLINDER_HEIGHT, WALL_THICKNESS};
 
-use crate::systems::environments::maze::{MAZE_POSITION, CELL_SIZE};
+use crate::systems::environments::maze::{
+    CELL_SIZE,
+    CATWALK_HEIGHT_OFFSET,
+    CATWALK_THICKNESS,
+};
 
 const AIRLOCK_POSITION: Vec3 = Vec3::new(779.1837, 2.6249955, -423.27768);
 const GAME_START: Vec3 = Vec3::new(165.00298, 2.6249952, -150.00085);
@@ -34,9 +36,9 @@ const REACTOR: Vec3 = Vec3::new(-910.0, 1.6, 1830.0);
 const ICE_CAVE_POSITION: Vec3 = Vec3::new(-857.4748, -117.847946, 1850.5758);
 
 static MAZE_START: Vec3 = Vec3::new(
-    2700.0 + CELL_SIZE,
-    2.625,
-    2200.0 + CELL_SIZE
+    2700.0 + CELL_SIZE,  // X position (first cell)
+    2.625 + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS, // Removed WALL_HEIGHT, adjusted for player height
+    2200.0 + CELL_SIZE   // Z position (first cell)
 );
 
 use crate::components::Protagonist;

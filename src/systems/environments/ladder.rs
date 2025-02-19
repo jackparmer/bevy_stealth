@@ -132,5 +132,36 @@ pub fn spawn_ladder(
                 ..default()
             },
         ));
+
+        // Add top platform sensor
+        parent.spawn((
+            RigidBody::Static,
+            Collider::cuboid(
+                LADDER_WIDTH * 1.5,
+                LADDER_THICKNESS,
+                LADDER_WIDTH * 1.5
+            ),
+            Sensor,
+            Name::new("LadderTopSensor"),
+            PbrBundle {
+                mesh: meshes.add(Cuboid::new(
+                    LADDER_WIDTH * 1.5,
+                    LADDER_THICKNESS,
+                    LADDER_WIDTH * 1.5
+                )),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::srgba(0.0, 1.0, 0.0, 0.1),
+                    emissive: Color::srgb(0.0, 0.5, 0.0).into(),
+                    alpha_mode: AlphaMode::Blend,
+                    ..default()
+                }),
+                transform: Transform::from_translation(Vec3::new(
+                    LADDER_THICKNESS + 1.0,
+                    config.height/2.0 + LADDER_THICKNESS,
+                    0.0
+                )),
+                ..default()
+            },
+        ));
     });
 }

@@ -12,6 +12,11 @@ pub fn check_falling(
     mut ambient_light: ResMut<AmbientLight>,
 ) {
     for (entity, mut protagonist, transform, _velocity) in protagonist_query.iter_mut() {
+        // Don't check falling for vehicles at all
+        if protagonist.is_driving {
+            continue;  // Skip the entire check for vehicles
+        }
+
         // Don't set falling state if swimming or climbing
         if protagonist.is_swimming || protagonist.is_climbing {
             protagonist.is_falling = false;

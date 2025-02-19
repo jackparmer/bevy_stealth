@@ -267,7 +267,9 @@ pub fn setup(
             was_swimming: false,
             is_driving: false,
             is_dirigible: false,
-            is_outside: false
+            is_outside: false,
+            is_birds_eye: false,
+            last_climb_toggle: 0.0,
         },
         SceneBundle {       
             scene: asset_server

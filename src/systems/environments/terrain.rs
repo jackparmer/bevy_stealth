@@ -8,20 +8,20 @@ use crate::components::Protagonist;
 
 // Terrain Generation Parameters
 const TERRAIN_RADIUS: f32 = 5000.0;
-const TERRAIN_RESOLUTION: i32 = 500;
+const TERRAIN_RESOLUTION: i32 = 1000;
 const TERRAIN_SEED: u32 = 42;
-const BASE_HEIGHT: f32 = -50.0;
-const Y_OFFSET: f32 = 50.0;
+const BASE_HEIGHT: f32 = -30.0;
+const Y_OFFSET: f32 = 30.0;
 
 // Noise Parameters
-const OCTAVE_COUNT: i32 = 4;
-const FREQUENCY_BASE: f64 = 2.5;
-const AMPLITUDE_BASE: f64 = 0.6;
-const NOISE_SCALE: f64 = 0.003;
-const HEIGHT_MULTIPLIER: f64 = 140.0;
+const OCTAVE_COUNT: i32 = 5;
+const FREQUENCY_BASE: f64 = 2.0;
+const AMPLITUDE_BASE: f64 = 0.5;
+const NOISE_SCALE: f64 = 0.002;
+const HEIGHT_MULTIPLIER: f64 = 100.0;
 
 #[derive(PhysicsLayer, Clone, Copy, Debug, Default)]
-enum GameLayer {
+pub enum GameLayer {
     #[default]
     Default,
     Terrain,
@@ -112,6 +112,25 @@ pub fn spawn_terrain(
         }
     }
 
+    let heights = vertices.clone().iter()
+        .map(|v| v[1])
+        .collect::<Vec<f32>>()
+        .chunks(TERRAIN_RESOLUTION as usize + 1)
+        .step_by(5)  // Take every 5th row
+        .map(|chunk| {
+            chunk.iter()
+                .step_by(5)  // Take every 5th column
+                .take(200)   // Fixed width
+                .cloned()
+                .map(|h| if h == 0.0 { BASE_HEIGHT } else { h })  // Replace invalid points
+                .collect::<Vec<f32>>()
+        })
+        .take(200)   // Fixed height
+        .collect::<Vec<Vec<f32>>>();
+
+    let heights_width = heights[0].len();
+    let heights_height = heights.len();
+
     let mut mesh = Mesh::new(
         bevy::render::render_resource::PrimitiveTopology::TriangleList,
         bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
@@ -136,11 +155,12 @@ pub fn spawn_terrain(
             transform: Transform::from_xyz(0.0, Y_OFFSET, 0.0),
             ..default()
         })
-        .insert(RigidBody::Static)
         .insert(ColliderConstructor::TrimeshFromMesh)
+        .insert(RigidBody::Static)
+        .insert(ColliderMarker)
         .insert(Friction {
-            dynamic_coefficient: 0.01,
-            static_coefficient: 0.01,
+            dynamic_coefficient: 0.2,
+            static_coefficient: 0.2,
             combine_rule: CoefficientCombine::Min,
         })
         .insert(Restitution {
@@ -151,7 +171,6 @@ pub fn spawn_terrain(
             memberships: GameLayer::Terrain.into(),  // Terrain layer
             filters: LayerMask(0b111),  // Can collide with Default, Player, and Terrain
         })
-        .insert(ColliderMarker)
         .insert(Terrain { is_icy: false });
 }
 

@@ -19,16 +19,20 @@ pub fn keyboard_animation_control(
     mut directional_light_query: Query<&mut DirectionalLight>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     animations: Res<ProtagonistAnimations>,
-    mut current_animation: Local<usize>,
 ) {
 
     let turn_speed = 3.0; // Fixed rotation speed (radians per second)
-    let move_speed = 5.0; // Units per second
-    let run_speed = 30.0; // Running speed (doubled from 10.0)
-    let strafe_speed = 4.0; // Strafing speed
+    let move_speed = 5.0; // Base units per second
+    let run_speed = 30.0; // Base running speed
+    let strafe_speed = 4.0; // Base strafing speed
     let underwater_speed = 30.0; // Underwater movement speed
 
-    if let Ok((mut protagonist_transform, protagonist)) = protagonist_query.get_single_mut() {
+    if let Ok((mut protagonist_transform, mut protagonist)) = protagonist_query.get_single_mut() {
+        // Calculate height multiplier
+        let height_multiplier = if protagonist_transform.translation.y > 100.0 { 2.0 } else { 1.0 };
+        let adjusted_move_speed = move_speed * height_multiplier;
+        let adjusted_run_speed = run_speed * height_multiplier;
+        let adjusted_strafe_speed = strafe_speed * height_multiplier;
 
         // Extract only Y rotation and force upright orientation
         let (yaw, _, _) = protagonist_transform.rotation.to_euler(EulerRot::YXZ);
@@ -180,9 +184,9 @@ pub fn keyboard_animation_control(
                 if !protagonist.is_swimming && !protagonist.is_falling {
                     // Handle movement speed based on driving state
                     let movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                        run_speed
+                        adjusted_run_speed
                     } else {
-                        move_speed
+                        adjusted_move_speed
                     };
 
                     // Apply movement without animations if driving
@@ -219,9 +223,9 @@ pub fn keyboard_animation_control(
                             }
                             
                             let movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                                strafe_speed * 2.0
+                                adjusted_strafe_speed * 2.0
                             } else {
-                                strafe_speed
+                                adjusted_strafe_speed
                             };
                             
                             for mut linear_velocity in velocity_query.iter_mut() {
@@ -248,9 +252,9 @@ pub fn keyboard_animation_control(
                             }
                             
                             let movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                                strafe_speed * 2.0
+                                adjusted_strafe_speed * 2.0
                             } else {
-                                strafe_speed
+                                adjusted_strafe_speed
                             };
                             
                             for mut linear_velocity in velocity_query.iter_mut() {
@@ -278,9 +282,9 @@ pub fn keyboard_animation_control(
                             }
                         }
                         let movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                            run_speed
+                            adjusted_run_speed
                         } else {
-                            move_speed
+                            adjusted_move_speed
                         };
 
                         for mut linear_velocity in velocity_query.iter_mut() {
@@ -304,9 +308,9 @@ pub fn keyboard_animation_control(
                             }
                         }
                         let movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                            run_speed
+                            adjusted_run_speed
                         } else {
-                            move_speed
+                            adjusted_move_speed
                         };
                         for mut linear_velocity in velocity_query.iter_mut() {
                             linear_velocity.0 = -protagonist_transform.forward() * movement_speed;
@@ -405,25 +409,10 @@ pub fn keyboard_animation_control(
                 }
             }
 
-            // Switch animations with Tab
+            // Replace the Tab animation cycling with camera toggle
             if keyboard_input.just_pressed(KeyCode::Tab) {
-                *current_animation = (*current_animation + 1) % animations.animations.len();
-                let key = PROTAGONIST_ANIMATIONS
-                    .iter()
-                    .find_map(|(k, &v)| if v == *current_animation { Some(k) } else { None });
-                println!(
-                    "Scene {}: {}",
-                    *current_animation,
-                    key.unwrap_or(&"* DISCARDED ANIMATION*")
-                );
-
-                transitions
-                    .play(
-                        &mut player,
-                        animations.animations[*current_animation],
-                        Duration::from_millis(250),
-                    )
-                    .set_repeat(RepeatAnimation::Forever);
+                protagonist.is_birds_eye = !protagonist.is_birds_eye;
+                info!("Camera view: {}", if protagonist.is_birds_eye { "Birds-eye" } else { "Normal" });
             }
         }        
     }

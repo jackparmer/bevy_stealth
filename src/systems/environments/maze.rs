@@ -12,12 +12,12 @@ pub const MAZE_POSITION: Vec3 = Vec3::new(
 pub const CELL_SIZE: f32 = 40.0;
 const WALL_HEIGHT: f32 = 100.0;
 const WALL_THICKNESS: f32 = 24.0;
-const MAZE_SIZE: usize = 8;
+const MAZE_SIZE: usize = 20;
 
 // Add catwalk configuration
-const CATWALK_HEIGHT_OFFSET: f32 = 10.0; // Height above walls
-const CATWALK_WIDTH: f32 = WALL_THICKNESS;
-const CATWALK_THICKNESS: f32 = 2.0;
+pub const CATWALK_HEIGHT_OFFSET: f32 = 10.0;
+pub const CATWALK_WIDTH: f32 = WALL_THICKNESS;
+pub const CATWALK_THICKNESS: f32 = 2.0;
 
 // Add neon configuration
 const NEON_WIDTH: f32 = 0.5;
@@ -25,7 +25,14 @@ const NEON_HEIGHT: f32 = 0.3;
 const NEON_OFFSET: f32 = CATWALK_WIDTH/2.0 + NEON_WIDTH/2.0;
 
 // Add ladder configuration
-const LADDER_STRUCTURE_WIDTH: f32 = 4.0; // Width of the ladder structure
+const LADDER_WALL_OFFSET: f32 = 2.0; // Reduced offset from wall
+
+// Add new constants for sphere and arrows (updated sizes)
+const SPHERE_RADIUS: f32 = 20.0;
+const ARROW_LENGTH: f32 = 1.5;  // Keep current length
+const ARROW_WIDTH: f32 = 0.75;  // Keep current width
+const ARROW_HEAD_LENGTH: f32 = 1.0;   // Increased from 0.5
+const ARROW_HEAD_WIDTH: f32 = 2.0;    // Increased from 1.0
 
 #[derive(Clone, Copy, PartialEq)]
 enum Cell {
@@ -87,6 +94,7 @@ fn find_vertical_segments(maze: &Vec<Vec<Cell>>) -> Vec<(usize, usize, usize)> {
     segments
 }
 
+
 pub fn spawn_maze(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -97,11 +105,51 @@ pub fn spawn_maze(
     let maze = generate_maze(&mut rng);
     
     let wall_material = materials.add(StandardMaterial {
-        base_color_texture: Some(asset_server.load("textures/concrete.png")),
-        perceptual_roughness: 0.95,
-        metallic: 0.1,
+        base_color_texture: Some(asset_server.load("textures/ice_texture3.png")),
+        perceptual_roughness: 0.1,
+        metallic: 0.8,
         ..default()
     });
+
+    // Find continuous wall segments
+    let h_segments = find_horizontal_segments(&maze);
+    let v_segments = find_vertical_segments(&maze);
+
+    // Spawn horizontal wall segments
+    for (row, start_col, end_col) in &h_segments {
+        let segment_length = (*end_col - *start_col + 1) as f32 * CELL_SIZE;
+        let x = MAZE_POSITION.x + (*start_col as f32 * CELL_SIZE) + segment_length/2.0;
+        let z = MAZE_POSITION.z + (*row as f32 * CELL_SIZE);
+        
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(Cuboid::new(segment_length, WALL_HEIGHT, WALL_THICKNESS)),
+                material: wall_material.clone(),
+                transform: Transform::from_xyz(x, MAZE_POSITION.y + WALL_HEIGHT/2.0, z),
+                ..default()
+            },
+            RigidBody::Static,
+            Collider::cuboid(segment_length, WALL_HEIGHT, WALL_THICKNESS),
+        ));
+    }
+
+    // Spawn vertical wall segments
+    for (col, start_row, end_row) in &v_segments {
+        let segment_length = (*end_row - *start_row + 1) as f32 * CELL_SIZE;
+        let x = MAZE_POSITION.x + (*col as f32 * CELL_SIZE);
+        let z = MAZE_POSITION.z + (*start_row as f32 * CELL_SIZE) + segment_length/2.0;
+        
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(Cuboid::new(WALL_THICKNESS, WALL_HEIGHT, segment_length)),
+                material: wall_material.clone(),
+                transform: Transform::from_xyz(x, MAZE_POSITION.y + WALL_HEIGHT/2.0, z),
+                ..default()
+            },
+            RigidBody::Static,
+            Collider::cuboid(WALL_THICKNESS, WALL_HEIGHT, segment_length),
+        ));
+    }
 
     // Catwalk material
     let catwalk_material = materials.add(StandardMaterial {
@@ -120,125 +168,94 @@ pub fn spawn_maze(
         ..default()
     });
 
-    // Spawn visual meshes for walls
-    for row in 0..MAZE_SIZE-1 {
-        for col in 0..MAZE_SIZE-1 {
-            let x = MAZE_POSITION.x + (col as f32 * CELL_SIZE);
-            let z = MAZE_POSITION.z + (row as f32 * CELL_SIZE);
-
-            // Horizontal wall visuals
-            if maze[row][col] == Cell::Wall && maze[row][col+1] == Cell::Wall {
-                commands.spawn(PbrBundle {
-                    mesh: meshes.add(Cuboid::new(
-                        CELL_SIZE - WALL_THICKNESS,
-                        WALL_HEIGHT,
-                        WALL_THICKNESS,
-                    )),
-                    material: wall_material.clone(),
-                    transform: Transform::from_xyz(
-                        x + CELL_SIZE/2.0, 
-                        MAZE_POSITION.y + WALL_HEIGHT/2.0, 
-                        z
-                    ),
-                    ..default()
-                });
-            }
-
-            // Vertical wall visuals
-            if maze[row][col] == Cell::Wall && maze[row+1][col] == Cell::Wall {
-                commands.spawn(PbrBundle {
-                    mesh: meshes.add(Cuboid::new(
-                        WALL_THICKNESS,
-                        WALL_HEIGHT,
-                        CELL_SIZE - WALL_THICKNESS,
-                    )),
-                    material: wall_material.clone(),
-                    transform: Transform::from_xyz(
-                        x, 
-                        MAZE_POSITION.y + WALL_HEIGHT/2.0, 
-                        z + CELL_SIZE/2.0
-                    ),
-                    ..default()
-                });
-            }
-
-            // Corner posts visuals
-            if maze[row][col] == Cell::Wall {
-                commands.spawn(PbrBundle {
-                    mesh: meshes.add(Cuboid::new(
-                        WALL_THICKNESS,
-                        WALL_HEIGHT,
-                        WALL_THICKNESS,
-                    )),
-                    material: wall_material.clone(),
-                    transform: Transform::from_xyz(x, MAZE_POSITION.y + WALL_HEIGHT/2.0, z),
-                    ..default()
-                });
-            }
-        }
-    }
-
-    // Spawn consolidated horizontal wall colliders
-    for (row, start_col, end_col) in find_horizontal_segments(&maze) {
-        let segment_length = (end_col - start_col) as f32 * CELL_SIZE;
-        let start_x = MAZE_POSITION.x + (start_col as f32 * CELL_SIZE);
-        let z = MAZE_POSITION.z + (row as f32 * CELL_SIZE);
-
-        commands.spawn((
-            TransformBundle::from(Transform::from_xyz(
-                start_x + segment_length/2.0,
-                MAZE_POSITION.y + WALL_HEIGHT/2.0,
-                z
-            )),
-            RigidBody::Static,
-            Collider::cuboid(
-                segment_length,
-                WALL_HEIGHT,
-                WALL_THICKNESS + 4.0
-            ),
-        ));
-    }
-
-    // Spawn consolidated vertical wall colliders
-    for (col, start_row, end_row) in find_vertical_segments(&maze) {
-        let segment_length = (end_row - start_row + 1) as f32 * CELL_SIZE;
-        let x = MAZE_POSITION.x + (col as f32 * CELL_SIZE);
-        let start_z = MAZE_POSITION.z + (start_row as f32 * CELL_SIZE);
-
-        commands.spawn((
-            TransformBundle::from(Transform::from_xyz(
-                x,
-                MAZE_POSITION.y + WALL_HEIGHT/2.0,
-                start_z + segment_length/2.0
-            )),
-            RigidBody::Static,
-            Collider::cuboid(
-                WALL_THICKNESS + 4.0,
-                WALL_HEIGHT,
-                segment_length
-            ),
-        ));
-    }
-
     let catwalk_y = MAZE_POSITION.y + WALL_HEIGHT + CATWALK_HEIGHT_OFFSET;
 
-    // Spawn horizontal catwalks with neon strips
-    for (row, start_col, end_col) in find_horizontal_segments(&maze) {
-        let segment_length = (end_col - start_col + 1) as f32 * CELL_SIZE;
-        let start_x = MAZE_POSITION.x + (start_col as f32 * CELL_SIZE);
-        let z = MAZE_POSITION.z + (row as f32 * CELL_SIZE);
+    // Find all segments first
+    let h_segments = find_horizontal_segments(&maze);
+    let v_segments = find_vertical_segments(&maze);
+    
+    // Create sphere material with dirigible texture
+    let sphere_material = materials.add(StandardMaterial {
+        base_color: Color::WHITE,
+        base_color_texture: Some(asset_server.load("textures/american-flag-background.png")),
+        metallic: 0.8,
+        perceptual_roughness: 0.1,
+        reflectance: 0.7,
+        ..default()
+    });
 
-        // Main catwalk spawn
+    // Create arrow material
+    let arrow_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(1.0, 1.0, 0.0),
+        emissive: Color::srgb(1.0, 1.0, 0.0).into(),
+        metallic: 0.0,
+        perceptual_roughness: 0.1,
+        ..default()
+    });
+
+    // Place sphere at opposite corner from entrance, without path validation
+    let end_point = (MAZE_SIZE-2, MAZE_SIZE-2);
+
+    // Place sphere regardless of path existence
+    let sphere_x = MAZE_POSITION.x + (end_point.0 as f32 * CELL_SIZE);
+    let sphere_z = MAZE_POSITION.z + (end_point.1 as f32 * CELL_SIZE);
+    let sphere_y = catwalk_y + SPHERE_RADIUS * 1.2;
+    let sphere_pos = Vec3::new(sphere_x, sphere_y, sphere_z);
+
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Sphere::new(SPHERE_RADIUS)),
+        material: sphere_material,
+        transform: Transform::from_translation(sphere_pos),
+        ..default()
+    });
+
+    // When spawning catwalks, make arrows point to sphere position
+    let sphere_target = Vec3::new(
+        MAZE_POSITION.x + (end_point.0 as f32 * CELL_SIZE),
+        catwalk_y + CATWALK_THICKNESS/2.0 + 0.01,
+        MAZE_POSITION.z + (end_point.1 as f32 * CELL_SIZE)
+    );
+
+    // For horizontal segments
+    let mut processed_h_segments = std::collections::HashSet::new();
+
+    for (row, start_col, end_col) in &h_segments {
+        // Skip if we've already processed this segment as part of a bridge
+        if processed_h_segments.contains(&(*row, *start_col)) {
+            continue;
+        }
+
+        let current_end = *end_col;
+        let mut total_length = (*end_col - *start_col + 1) as f32 * CELL_SIZE;
+        
+        // Look ahead for segments we can bridge to
+        let mut next_col = current_end + 1;
+        while next_col < MAZE_SIZE {
+            if let Some((_, bridge_start, bridge_end)) = h_segments.iter()
+                .find(|&&(r, s, _)| r == *row && s == next_col) {
+                // Found a segment to bridge to
+                total_length += (*bridge_end - *bridge_start + 2) as f32 * CELL_SIZE;
+                next_col = *bridge_end + 1;
+                processed_h_segments.insert((*row, *bridge_start));
+            } else {
+                break;
+            }
+        }
+
+        let start_x = MAZE_POSITION.x + (*start_col as f32 * CELL_SIZE);
+        let z = MAZE_POSITION.z + (*row as f32 * CELL_SIZE);
+
+        // Spawn single continuous catwalk with one collider
         commands.spawn((
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(
-                    segment_length,
+                    total_length + CATWALK_WIDTH,
                     CATWALK_THICKNESS,
                     CATWALK_WIDTH,
                 )),
                 material: catwalk_material.clone(),
                 transform: Transform::from_xyz(
-                    start_x + segment_length/2.0,
+                    start_x + total_length/2.0,
                     catwalk_y,
                     z
                 ),
@@ -246,171 +263,248 @@ pub fn spawn_maze(
             },
             RigidBody::Static,
             Collider::cuboid(
-                segment_length + 4.0,
+                total_length + CATWALK_WIDTH,
                 CATWALK_THICKNESS,
-                CATWALK_WIDTH + 4.0
+                CATWALK_WIDTH
             ),
         ));
 
-        // Modified neon strips to stop before corners
+        // Single continuous neon strips
         for offset in [-NEON_OFFSET, NEON_OFFSET] {
-            let strip_length = segment_length - CATWALK_WIDTH; // Subtract platform width to prevent overlap
             commands.spawn(PbrBundle {
                 mesh: meshes.add(Cuboid::new(
-                    strip_length,
+                    total_length + CATWALK_WIDTH,
                     NEON_HEIGHT,
                     NEON_WIDTH,
                 )),
                 material: neon_material.clone(),
                 transform: Transform::from_xyz(
-                    start_x + segment_length/2.0,
+                    start_x + total_length/2.0,
                     catwalk_y + CATWALK_THICKNESS/2.0,
                     z + offset
                 ),
                 ..default()
             });
         }
+
+        // In the horizontal segments loop, update arrow spawning:
+        let segment_center = Vec3::new(
+            start_x + total_length/2.0,
+            catwalk_y + CATWALK_THICKNESS/2.0 + 0.01,
+            z
+        );
+
+        // Point directly to sphere instead of path
+        let mut direction = (sphere_target - segment_center).normalize();
+        direction.y = 0.0; // Force Y component to zero
+        direction = direction.normalize();
+
+        let rotation = Quat::from_rotation_arc(Vec3::X, direction);
+
+        // Spawn arrow shaft flush with surface
+        commands.spawn(PbrBundle {
+            mesh: meshes.add(Cuboid::new(ARROW_LENGTH, 0.01, ARROW_WIDTH)),
+            material: arrow_material.clone(),
+            transform: Transform::from_translation(segment_center)
+                .with_rotation(rotation),
+            ..default()
+        });
+
+        // Spawn arrow head flush with surface
+        commands.spawn(PbrBundle {
+            mesh: meshes.add(Triangle3d::new(
+                Vec3::new(ARROW_HEAD_LENGTH, 0.0, -ARROW_HEAD_WIDTH/2.0),
+                Vec3::new(ARROW_HEAD_LENGTH, 0.0, ARROW_HEAD_WIDTH/2.0),
+                Vec3::new(ARROW_HEAD_LENGTH + ARROW_HEAD_LENGTH, 0.0, 0.0)
+            )),
+            material: arrow_material.clone(),
+            transform: Transform::from_translation(segment_center)
+                .with_rotation(rotation),
+            ..default()
+        });
     }
 
-    // Spawn vertical catwalks with neon strips
-    for (col, start_row, end_row) in find_vertical_segments(&maze) {
-        let segment_length = (end_row - start_row + 1) as f32 * CELL_SIZE;
-        let x = MAZE_POSITION.x + (col as f32 * CELL_SIZE);
-        let start_z = MAZE_POSITION.z + (start_row as f32 * CELL_SIZE);
+    // For vertical segments
+    let mut processed_v_segments = std::collections::HashSet::new();
 
-        // Main catwalk spawn
+    for (col, start_row, end_row) in &v_segments {
+        // Skip if we've already processed this segment as part of a bridge
+        if processed_v_segments.contains(&(*col, *start_row)) {
+            continue;
+        }
+
+        let current_end = *end_row;
+        let mut total_length = (*end_row - *start_row + 1) as f32 * CELL_SIZE;
+        
+        // Look ahead for segments we can bridge to
+        let mut next_row = current_end + 1;
+        while next_row < MAZE_SIZE {
+            if let Some((bridge_col, bridge_start, bridge_end)) = v_segments.iter()
+                .find(|&&(c, s, _)| c == *col && s == next_row) {
+                // Found a segment to bridge to
+                total_length += (*bridge_end - *bridge_start + 2) as f32 * CELL_SIZE;
+                next_row = *bridge_end + 1;
+                processed_v_segments.insert((*bridge_col, *bridge_start));
+            } else {
+                break;
+            }
+        }
+
+        let x = MAZE_POSITION.x + (*col as f32 * CELL_SIZE);
+        let start_z = MAZE_POSITION.z + (*start_row as f32 * CELL_SIZE);
+
+        // Spawn single continuous catwalk with one collider
         commands.spawn((
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(
                     CATWALK_WIDTH,
                     CATWALK_THICKNESS,
-                    segment_length,
+                    total_length + CATWALK_WIDTH,
                 )),
                 material: catwalk_material.clone(),
                 transform: Transform::from_xyz(
                     x,
                     catwalk_y,
-                    start_z + segment_length/2.0
+                    start_z + total_length/2.0
                 ),
                 ..default()
             },
             RigidBody::Static,
             Collider::cuboid(
-                CATWALK_WIDTH + 4.0,
+                CATWALK_WIDTH,
                 CATWALK_THICKNESS,
-                segment_length + 4.0
+                total_length + CATWALK_WIDTH
             ),
         ));
 
-        // Modified neon strips to stop before corners
+        // Single continuous neon strips
         for offset in [-NEON_OFFSET, NEON_OFFSET] {
-            let strip_length = segment_length - CATWALK_WIDTH; // Subtract platform width to prevent overlap
             commands.spawn(PbrBundle {
                 mesh: meshes.add(Cuboid::new(
                     NEON_WIDTH,
                     NEON_HEIGHT,
-                    strip_length,
+                    total_length + CATWALK_WIDTH,
                 )),
                 material: neon_material.clone(),
                 transform: Transform::from_xyz(
                     x + offset,
                     catwalk_y + CATWALK_THICKNESS/2.0,
-                    start_z + segment_length/2.0
+                    start_z + total_length/2.0
                 ),
                 ..default()
             });
         }
+
+        // Similarly for vertical segments:
+        let segment_center = Vec3::new(
+            x,
+            catwalk_y + CATWALK_THICKNESS/2.0 + 0.01,
+            start_z + total_length/2.0
+        );
+
+        // Point directly to sphere
+        let mut direction = (sphere_target - segment_center).normalize();
+        direction.y = 0.0;
+        direction = direction.normalize();
+
+        let rotation = Quat::from_rotation_arc(Vec3::X, direction);
+
+        // Spawn arrow shaft flush with surface
+        commands.spawn(PbrBundle {
+            mesh: meshes.add(Cuboid::new(ARROW_LENGTH, 0.01, ARROW_WIDTH)),
+            material: arrow_material.clone(),
+            transform: Transform::from_translation(segment_center)
+                .with_rotation(rotation),
+            ..default()
+        });
+
+        // Spawn arrow head flush with surface
+        commands.spawn(PbrBundle {
+            mesh: meshes.add(Triangle3d::new(
+                Vec3::new(ARROW_HEAD_LENGTH, 0.0, -ARROW_HEAD_WIDTH/2.0),
+                Vec3::new(ARROW_HEAD_LENGTH, 0.0, ARROW_HEAD_WIDTH/2.0),
+                Vec3::new(ARROW_HEAD_LENGTH + ARROW_HEAD_LENGTH, 0.0, 0.0)
+            )),
+            material: arrow_material.clone(),
+            transform: Transform::from_translation(segment_center)
+                .with_rotation(rotation),
+            ..default()
+        });
     }
 
-    // Remove the intersection platform neon strips since they're no longer needed
+    // Add ground-to-wall ladders at wall ends, but only on certain conditions
     for row in 0..MAZE_SIZE-1 {
         for col in 0..MAZE_SIZE-1 {
-            if maze[row][col] == Cell::Wall {
-                let x = MAZE_POSITION.x + (col as f32 * CELL_SIZE);
-                let z = MAZE_POSITION.z + (row as f32 * CELL_SIZE);
-                
-                // Spawn only the platform without neon strips
-                commands.spawn(PbrBundle {
-                    mesh: meshes.add(Cuboid::new(
-                        CATWALK_WIDTH,
-                        CATWALK_THICKNESS,
-                        CATWALK_WIDTH,
-                    )),
-                    material: catwalk_material.clone(),
-                    transform: Transform::from_xyz(x, catwalk_y, z),
-                    ..default()
-                });
+            // Changed from % 300 to % 5 to spawn many more ladders
+            if (row + col) % 5 != 0 {
+                continue;
             }
-        }
-    }
 
-    // Add ground-to-wall ladders at wall ends
-    for row in 0..MAZE_SIZE-1 {
-        for col in 0..MAZE_SIZE-1 {
             if maze[row][col] == Cell::Wall {
                 let x = MAZE_POSITION.x + (col as f32 * CELL_SIZE);
                 let z = MAZE_POSITION.z + (row as f32 * CELL_SIZE);
 
-                // Check if this wall has a path next to it (to place ladder against the wall)
+                // Check if this wall has a path next to it
                 let has_path_north = row > 0 && maze[row-1][col] == Cell::Path;
                 let has_path_south = row < MAZE_SIZE-1 && maze[row+1][col] == Cell::Path;
                 let has_path_east = col < MAZE_SIZE-1 && maze[row][col+1] == Cell::Path;
                 let has_path_west = col > 0 && maze[row][col-1] == Cell::Path;
 
-                // Calculate total ladder height to reach catwalks (including catwalk thickness)
+                // Calculate total ladder height
                 let ladder_height = WALL_HEIGHT + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
 
-                // Spawn ladders against walls where there's a path
-                if has_path_north {
+                // Only spawn ladders if there's a path on one side and walls on the adjacent sides
+                // This reduces the number of ladders and places them in more strategic locations
+                if has_path_north && !has_path_east && !has_path_west {
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
                         &mut materials,
                         &asset_server,
                         LadderConfig {
-                            position: Vec3::new(x, MAZE_POSITION.y, z - WALL_THICKNESS/2.0 - LADDER_STRUCTURE_WIDTH/2.0),
+                            position: Vec3::new(x, MAZE_POSITION.y, z - WALL_THICKNESS/2.0 - LADDER_WALL_OFFSET),
                             rotation: Quat::from_rotation_y(std::f32::consts::PI * 0.5),
                             height: ladder_height,
                             rung_count: 150,
                         },
                     );
                 }
-                if has_path_south {
+                if has_path_south && !has_path_east && !has_path_west {
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
                         &mut materials,
                         &asset_server,
                         LadderConfig {
-                            position: Vec3::new(x, MAZE_POSITION.y, z + WALL_THICKNESS/2.0 + LADDER_STRUCTURE_WIDTH/2.0),
+                            position: Vec3::new(x, MAZE_POSITION.y, z + WALL_THICKNESS/2.0 + LADDER_WALL_OFFSET),
                             rotation: Quat::from_rotation_y(std::f32::consts::PI * 1.5),
                             height: ladder_height,
                             rung_count: 150,
                         },
                     );
                 }
-                if has_path_east {
+                if has_path_east && !has_path_north && !has_path_south {
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
                         &mut materials,
                         &asset_server,
                         LadderConfig {
-                            position: Vec3::new(x + WALL_THICKNESS/2.0 + LADDER_STRUCTURE_WIDTH/2.0, MAZE_POSITION.y, z),
+                            position: Vec3::new(x + WALL_THICKNESS/2.0 + LADDER_WALL_OFFSET, MAZE_POSITION.y, z),
                             rotation: Quat::from_rotation_y(0.0),
                             height: ladder_height,
                             rung_count: 150,
                         },
                     );
                 }
-                if has_path_west {
+                if has_path_west && !has_path_north && !has_path_south {
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
                         &mut materials,
                         &asset_server,
                         LadderConfig {
-                            position: Vec3::new(x - WALL_THICKNESS/2.0 - LADDER_STRUCTURE_WIDTH/2.0, MAZE_POSITION.y, z),
+                            position: Vec3::new(x - WALL_THICKNESS/2.0 - LADDER_WALL_OFFSET, MAZE_POSITION.y, z),
                             rotation: Quat::from_rotation_y(std::f32::consts::PI),
                             height: ladder_height,
                             rung_count: 150,
@@ -424,74 +518,94 @@ pub fn spawn_maze(
 
 fn generate_maze(rng: &mut StdRng) -> Vec<Vec<Cell>> {
     let mut maze = vec![vec![Cell::Wall; MAZE_SIZE]; MAZE_SIZE];
-    let mut stack = Vec::new();
     
-    // Start at a random position
-    let start_x = 1;
-    let start_y = 1;
-    maze[start_y][start_x] = Cell::Path;
-    stack.push((start_x, start_y));
+    // Create outer walls
+    for x in 0..MAZE_SIZE {
+        maze[0][x] = Cell::Wall;
+        maze[MAZE_SIZE-1][x] = Cell::Wall;
+    }
+    for y in 0..MAZE_SIZE {
+        maze[y][0] = Cell::Wall;
+        maze[y][MAZE_SIZE-1] = Cell::Wall;
+    }
 
-    while let Some(&(current_x, current_y)) = stack.last() {
-        let directions = vec![
-            (0, -2), // North
-            (2, 0),  // East
-            (0, 2),  // South
-            (-2, 0), // West
-        ];
-
-        let valid_moves: Vec<_> = directions.iter()
-            .filter(|&&(dx, dy)| {
-                let new_x = current_x as i32 + dx;
-                let new_y = current_y as i32 + dy;
-                new_x > 0 && new_x < (MAZE_SIZE - 1) as i32 &&
-                new_y > 0 && new_y < (MAZE_SIZE - 1) as i32 &&
-                maze[new_y as usize][new_x as usize] == Cell::Wall
-            })
-            .collect();
-
-        if valid_moves.is_empty() {
-            stack.pop();
-            continue;
+    // Start with all cells as walls
+    let mut frontier = Vec::new();
+    
+    // Start from (1,1)
+    maze[1][1] = Cell::Path;
+    add_frontiers(1, 1, &maze, &mut frontier);
+    
+    // While there are frontier cells
+    while !frontier.is_empty() {
+        // Pick a random frontier cell
+        let idx = rng.gen_range(0..frontier.len());
+        let (x, y) = frontier.swap_remove(idx);
+        
+        // Get all adjacent path cells
+        let mut adjacent_paths = Vec::new();
+        for (dx, dy) in &[(0, -2), (2, 0), (0, 2), (-2, 0)] {
+            let nx = (x as i32 + dx) as usize;
+            let ny = (y as i32 + dy) as usize;
+            if nx < MAZE_SIZE && ny < MAZE_SIZE && maze[ny][nx] == Cell::Path {
+                adjacent_paths.push((nx, ny));
+            }
         }
-
-        let &(dx, dy) = valid_moves.choose(rng).unwrap();
-        let new_x = (current_x as i32 + dx) as usize;
-        let new_y = (current_y as i32 + dy) as usize;
         
-        // Carve the path
-        maze[new_y][new_x] = Cell::Path;
-        maze[(current_y + new_y) / 2][(current_x + new_x) / 2] = Cell::Path;
-        
-        stack.push((new_x, new_y));
+        // Connect to a random adjacent path
+        if let Some(&(px, py)) = adjacent_paths.choose(rng) {
+            // Create a path between the cells
+            maze[y][x] = Cell::Path;
+            maze[(y + py) / 2][(x + px) / 2] = Cell::Path;
+            
+            // Add new frontier cells
+            add_frontiers(x, y, &maze, &mut frontier);
+        }
     }
 
-    // Create an opening at the edge
-    // Choose a random edge cell that's adjacent to a path
-    let edge_candidates: Vec<(usize, usize)> = (1..MAZE_SIZE-1)
-        .flat_map(|i| vec![
-            (i, 0),           // North edge
-            (i, MAZE_SIZE-1), // South edge
-            (0, i),           // West edge
-            (MAZE_SIZE-1, i)  // East edge
-        ])
-        .filter(|&(x, y)| {
-            // Check if adjacent cell is a path
-            let has_adjacent_path = match (x, y) {
-                (_, 0) => maze[1][x] == Cell::Path,           // North edge
-                (_, y) if y == MAZE_SIZE-1 => maze[MAZE_SIZE-2][x] == Cell::Path, // South edge
-                (0, y) => maze[y][1] == Cell::Path,           // West edge
-                (x, y) if x == MAZE_SIZE-1 => maze[y][MAZE_SIZE-2] == Cell::Path, // East edge
-                _ => false
-            };
-            has_adjacent_path
-        })
-        .collect();
-
-    if let Some(&(x, y)) = edge_candidates.choose(rng) {
-        maze[y][x] = Cell::Path;
+    // Add random loops to make it more interesting
+    for _ in 0..MAZE_SIZE * 2 {
+        let x = rng.gen_range(2..MAZE_SIZE-2);
+        let y = rng.gen_range(2..MAZE_SIZE-2);
+        if maze[y][x] == Cell::Wall && count_adjacent_paths(&maze, x, y) >= 2 {
+            maze[y][x] = Cell::Path;
+        }
     }
+
+    // Ensure entrance and exit are clear
+    maze[1][1] = Cell::Path;
+    maze[1][0] = Cell::Path;
+    maze[MAZE_SIZE-2][MAZE_SIZE-2] = Cell::Path;
 
     maze
+}
+
+fn add_frontiers(x: usize, y: usize, maze: &Vec<Vec<Cell>>, frontier: &mut Vec<(usize, usize)>) {
+    for (dx, dy) in &[(0, -2), (2, 0), (0, 2), (-2, 0)] {
+        let nx = (x as i32 + dx) as usize;
+        let ny = (y as i32 + dy) as usize;
+        if nx < MAZE_SIZE-1 && ny < MAZE_SIZE-1 && maze[ny][nx] == Cell::Wall {
+            if !frontier.contains(&(nx, ny)) {
+                frontier.push((nx, ny));
+            }
+        }
+    }
+}
+
+// Helper function to count adjacent path cells
+fn count_adjacent_paths(maze: &Vec<Vec<Cell>>, x: usize, y: usize) -> usize {
+    let directions = [(0, -1), (1, 0), (0, 1), (-1, 0)];
+    directions.iter()
+        .filter(|&&(dx, dy)| {
+            let new_x = x as i32 + dx;
+            let new_y = y as i32 + dy;
+            if new_x >= 0 && new_x < MAZE_SIZE as i32 && 
+               new_y >= 0 && new_y < MAZE_SIZE as i32 {
+                maze[new_y as usize][new_x as usize] == Cell::Path
+            } else {
+                false
+            }
+        })
+        .count()
 }
 
