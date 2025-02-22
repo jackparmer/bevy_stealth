@@ -159,8 +159,8 @@ pub fn spawn_terrain(
         .insert(RigidBody::Static)
         .insert(ColliderMarker)
         .insert(Friction {
-            dynamic_coefficient: 0.2,
-            static_coefficient: 0.2,
+            dynamic_coefficient: 0.0,
+            static_coefficient: 0.0,
             combine_rule: CoefficientCombine::Min,
         })
         .insert(Restitution {

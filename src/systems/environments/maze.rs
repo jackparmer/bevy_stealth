@@ -34,6 +34,10 @@ const ARROW_WIDTH: f32 = 0.75;  // Keep current width
 const ARROW_HEAD_LENGTH: f32 = 1.0;   // Increased from 0.5
 const ARROW_HEAD_WIDTH: f32 = 2.0;    // Increased from 1.0
 
+// Add height variation constants
+const MAX_WALL_HEIGHT: f32 = 200.0; // Increased from 200.0
+const MIN_WALL_HEIGHT: f32 = 80.0;  // Increased from 30.0
+
 #[derive(Clone, Copy, PartialEq)]
 enum Cell {
     Wall,
@@ -94,6 +98,18 @@ fn find_vertical_segments(maze: &Vec<Vec<Cell>>) -> Vec<(usize, usize, usize)> {
     segments
 }
 
+// Helper function to calculate wall height based on position
+fn get_wall_height(x: f32, z: f32) -> f32 {
+    let normalized_x = x - MAZE_POSITION.x;
+    let normalized_z = z - MAZE_POSITION.z;
+    let max_distance = CELL_SIZE * MAZE_SIZE as f32;
+    
+    // Calculate distance from (0,0) as a percentage
+    let distance_factor = ((normalized_x.powi(2) + normalized_z.powi(2)).sqrt()) / max_distance;
+    
+    // Use a more dramatic curve for height variation (power of 0.5 creates more extreme variation)
+    MAX_WALL_HEIGHT - (MAX_WALL_HEIGHT - MIN_WALL_HEIGHT) * distance_factor.powf(0.5)
+}
 
 pub fn spawn_maze(
     mut commands: Commands,
@@ -121,15 +137,17 @@ pub fn spawn_maze(
         let x = MAZE_POSITION.x + (*start_col as f32 * CELL_SIZE) + segment_length/2.0;
         let z = MAZE_POSITION.z + (*row as f32 * CELL_SIZE);
         
+        let wall_height = get_wall_height(x, z);
+        
         commands.spawn((
             PbrBundle {
-                mesh: meshes.add(Cuboid::new(segment_length, WALL_HEIGHT, WALL_THICKNESS)),
+                mesh: meshes.add(Cuboid::new(segment_length, wall_height, WALL_THICKNESS)),
                 material: wall_material.clone(),
-                transform: Transform::from_xyz(x, MAZE_POSITION.y + WALL_HEIGHT/2.0, z),
+                transform: Transform::from_xyz(x, MAZE_POSITION.y + wall_height/2.0, z),
                 ..default()
             },
             RigidBody::Static,
-            Collider::cuboid(segment_length, WALL_HEIGHT, WALL_THICKNESS),
+            Collider::cuboid(segment_length, wall_height, WALL_THICKNESS),
         ));
     }
 
@@ -139,15 +157,17 @@ pub fn spawn_maze(
         let x = MAZE_POSITION.x + (*col as f32 * CELL_SIZE);
         let z = MAZE_POSITION.z + (*start_row as f32 * CELL_SIZE) + segment_length/2.0;
         
+        let wall_height = get_wall_height(x, z);
+        
         commands.spawn((
             PbrBundle {
-                mesh: meshes.add(Cuboid::new(WALL_THICKNESS, WALL_HEIGHT, segment_length)),
+                mesh: meshes.add(Cuboid::new(WALL_THICKNESS, wall_height, segment_length)),
                 material: wall_material.clone(),
-                transform: Transform::from_xyz(x, MAZE_POSITION.y + WALL_HEIGHT/2.0, z),
+                transform: Transform::from_xyz(x, MAZE_POSITION.y + wall_height/2.0, z),
                 ..default()
             },
             RigidBody::Static,
-            Collider::cuboid(WALL_THICKNESS, WALL_HEIGHT, segment_length),
+            Collider::cuboid(WALL_THICKNESS, wall_height, segment_length),
         ));
     }
 
@@ -193,7 +213,7 @@ pub fn spawn_maze(
         ..default()
     });
 
-    // Place sphere at opposite corner from entrance, without path validation
+    // Place sphere at opposite corner (MAZE_SIZE-2, MAZE_SIZE-2) instead of (1,1)
     let end_point = (MAZE_SIZE-2, MAZE_SIZE-2);
 
     // Place sphere regardless of path existence
@@ -209,7 +229,7 @@ pub fn spawn_maze(
         ..default()
     });
 
-    // When spawning catwalks, make arrows point to sphere position
+    // Update sphere target position for arrows
     let sphere_target = Vec3::new(
         MAZE_POSITION.x + (end_point.0 as f32 * CELL_SIZE),
         catwalk_y + CATWALK_THICKNESS/2.0 + 0.01,
@@ -245,7 +265,13 @@ pub fn spawn_maze(
         let start_x = MAZE_POSITION.x + (*start_col as f32 * CELL_SIZE);
         let z = MAZE_POSITION.z + (*row as f32 * CELL_SIZE);
 
-        // Spawn single continuous catwalk with one collider
+        // Update catwalk spawning for horizontal segments
+        let wall_height = get_wall_height(
+            start_x + total_length/2.0,
+            z
+        );
+        let catwalk_y = wall_height + MAZE_POSITION.y + CATWALK_HEIGHT_OFFSET;
+
         commands.spawn((
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(
@@ -269,7 +295,7 @@ pub fn spawn_maze(
             ),
         ));
 
-        // Single continuous neon strips
+        // Update neon strips height
         for offset in [-NEON_OFFSET, NEON_OFFSET] {
             commands.spawn(PbrBundle {
                 mesh: meshes.add(Cuboid::new(
@@ -354,6 +380,9 @@ pub fn spawn_maze(
         let start_z = MAZE_POSITION.z + (*start_row as f32 * CELL_SIZE);
 
         // Spawn single continuous catwalk with one collider
+        let wall_height = get_wall_height(x, start_z + total_length/2.0);
+        let catwalk_y = wall_height + MAZE_POSITION.y + CATWALK_HEIGHT_OFFSET;
+
         commands.spawn((
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(
@@ -456,6 +485,8 @@ pub fn spawn_maze(
                 // Only spawn ladders if there's a path on one side and walls on the adjacent sides
                 // This reduces the number of ladders and places them in more strategic locations
                 if has_path_north && !has_path_east && !has_path_west {
+                    let wall_height = get_wall_height(x, z);
+                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -470,6 +501,8 @@ pub fn spawn_maze(
                     );
                 }
                 if has_path_south && !has_path_east && !has_path_west {
+                    let wall_height = get_wall_height(x, z);
+                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -484,6 +517,8 @@ pub fn spawn_maze(
                     );
                 }
                 if has_path_east && !has_path_north && !has_path_south {
+                    let wall_height = get_wall_height(x, z);
+                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -498,6 +533,8 @@ pub fn spawn_maze(
                     );
                 }
                 if has_path_west && !has_path_north && !has_path_south {
+                    let wall_height = get_wall_height(x, z);
+                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -519,30 +556,24 @@ pub fn spawn_maze(
 fn generate_maze(rng: &mut StdRng) -> Vec<Vec<Cell>> {
     let mut maze = vec![vec![Cell::Wall; MAZE_SIZE]; MAZE_SIZE];
     
-    // Create outer walls
-    for x in 0..MAZE_SIZE {
-        maze[0][x] = Cell::Wall;
-        maze[MAZE_SIZE-1][x] = Cell::Wall;
+    // Clear the perimeter walls
+    for i in 0..MAZE_SIZE {
+        maze[0][i] = Cell::Path;
+        maze[MAZE_SIZE-1][i] = Cell::Path;
+        maze[i][0] = Cell::Path;
+        maze[i][MAZE_SIZE-1] = Cell::Path;
     }
-    for y in 0..MAZE_SIZE {
-        maze[y][0] = Cell::Wall;
-        maze[y][MAZE_SIZE-1] = Cell::Wall;
-    }
-
-    // Start with all cells as walls
-    let mut frontier = Vec::new();
     
     // Start from (1,1)
     maze[1][1] = Cell::Path;
+    let mut frontier = Vec::new();
     add_frontiers(1, 1, &maze, &mut frontier);
     
-    // While there are frontier cells
+    // Rest of maze generation remains the same
     while !frontier.is_empty() {
-        // Pick a random frontier cell
         let idx = rng.gen_range(0..frontier.len());
         let (x, y) = frontier.swap_remove(idx);
         
-        // Get all adjacent path cells
         let mut adjacent_paths = Vec::new();
         for (dx, dy) in &[(0, -2), (2, 0), (0, 2), (-2, 0)] {
             let nx = (x as i32 + dx) as usize;
@@ -552,18 +583,14 @@ fn generate_maze(rng: &mut StdRng) -> Vec<Vec<Cell>> {
             }
         }
         
-        // Connect to a random adjacent path
         if let Some(&(px, py)) = adjacent_paths.choose(rng) {
-            // Create a path between the cells
             maze[y][x] = Cell::Path;
             maze[(y + py) / 2][(x + px) / 2] = Cell::Path;
-            
-            // Add new frontier cells
             add_frontiers(x, y, &maze, &mut frontier);
         }
     }
 
-    // Add random loops to make it more interesting
+    // Add random loops
     for _ in 0..MAZE_SIZE * 2 {
         let x = rng.gen_range(2..MAZE_SIZE-2);
         let y = rng.gen_range(2..MAZE_SIZE-2);
@@ -572,11 +599,8 @@ fn generate_maze(rng: &mut StdRng) -> Vec<Vec<Cell>> {
         }
     }
 
-    // Ensure entrance and exit are clear
     maze[1][1] = Cell::Path;
-    maze[1][0] = Cell::Path;
-    maze[MAZE_SIZE-2][MAZE_SIZE-2] = Cell::Path;
-
+    
     maze
 }
 
@@ -608,4 +632,3 @@ fn count_adjacent_paths(maze: &Vec<Vec<Cell>>, x: usize, y: usize) -> usize {
         })
         .count()
 }
-

@@ -68,7 +68,13 @@ pub fn check_falling(
 
         let is_grounded = !hits.is_empty();
         
-        protagonist.is_falling = !is_grounded;
+        // Reset jumping state when landing
+        if is_grounded && (protagonist.is_jumping || protagonist.is_falling) {
+            protagonist.is_jumping = false;
+            protagonist.is_falling = false;
+        } else if !is_grounded && !protagonist.is_jumping {
+            protagonist.is_falling = true;
+        }
 
         // Draw the ray
         // let ray_end = ray_pos + (ray_dir.as_vec3() * max_distance);
@@ -98,7 +104,7 @@ pub fn handle_falling_animation(
 ) {
     for (protagonist, _) in protagonist_query.iter() {
         // Skip falling animation if driving
-        if protagonist.is_falling && !protagonist.is_driving {
+        if (protagonist.is_falling || protagonist.is_jumping) && !protagonist.is_driving {
             for (mut player, mut transitions) in animation_players.iter_mut() {
                 if let Some(fly) = PROTAGONIST_ANIMATIONS.get("FLY") {
                     if !player.is_playing_animation(animations.animations[*fly]) {

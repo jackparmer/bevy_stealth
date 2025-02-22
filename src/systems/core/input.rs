@@ -353,11 +353,11 @@ pub fn keyboard_animation_control(
 
             // Handle jumping
             if keyboard_input.just_pressed(KeyCode::Space) 
-                && !protagonist.is_swimming  // Changed from is_underwater
+                && !protagonist.is_swimming
                 && !protagonist.is_climbing
-                && !protagonist.is_falling  // Only jump if not already in the air
+                && !protagonist.is_falling
             {
-                if let Some(jump) = PROTAGONIST_ANIMATIONS.get("JUMP") {
+                if let Some(jump) = PROTAGONIST_ANIMATIONS.get("FLY") {
                     transitions
                         .play(
                             &mut player,
@@ -367,7 +367,24 @@ pub fn keyboard_animation_control(
                         .set_repeat(RepeatAnimation::Never);
 
                     for mut impulse in impulse_query.iter_mut() {
-                        impulse.apply_impulse(Vec3::new(0.0, 2.0, 0.0));
+                        let mut jump_impulse = Vec3::new(0.0, 5.0, 0.0);
+                        
+                        // Add forward impulse if W is pressed
+                        if keyboard_input.pressed(KeyCode::KeyW) {
+                            let forward_strength = if keyboard_input.pressed(KeyCode::ShiftLeft) {
+                                4.0 // Stronger forward leap when running
+                            } else {
+                                2.0 // Normal forward leap
+                            };
+                            jump_impulse += protagonist_transform.forward() * forward_strength;
+                            
+                            // Increase vertical impulse for running leap
+                            if keyboard_input.pressed(KeyCode::ShiftLeft) {
+                                jump_impulse.y = 12.5;
+                            }
+                        }
+                        
+                        impulse.apply_impulse(jump_impulse);
                     }
 
                     break;

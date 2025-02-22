@@ -270,6 +270,7 @@ pub fn setup(
             is_outside: false,
             is_birds_eye: false,
             last_climb_toggle: 0.0,
+            is_jumping: false,
         },
         SceneBundle {       
             scene: asset_server

@@ -11,6 +11,7 @@ pub struct Protagonist {
     pub is_dirigible: bool,
     pub is_outside: bool,
     pub is_birds_eye: bool,
+    pub is_jumping: bool,
     pub last_climb_toggle: f32,
 }
 
@@ -26,6 +27,7 @@ impl Default for Protagonist {
             is_dirigible: false,
             is_outside: true,
             is_birds_eye: false,
+            is_jumping: false,
             last_climb_toggle: 0.0,
         }
     }

@@ -339,8 +339,61 @@ pub fn sentry_follow_system(
         let distance = direction.length();
 
         if distance < sentry.view_distance {
-            // Simple direct movement
-            let movement = direction.normalize() * sentry.follow_speed * time.delta_seconds();
+            // Split movement into horizontal and vertical components
+            let horizontal_direction = Vec3::new(direction.x, 0.0, direction.z).normalize();
+            let vertical_movement = direction.y;
+
+            // Check for vertical surface contact using raycasts
+            let side_ray_distance = 1.0;
+            let side_rays = [
+                (transform.translation, Vec3::X),
+                (transform.translation, Vec3::NEG_X),
+                (transform.translation, Vec3::Z),
+                (transform.translation, Vec3::NEG_Z),
+            ];
+
+            let mut can_climb = false;
+            for (ray_origin, ray_dir) in side_rays.iter() {
+                let hits = spatial_query.ray_hits(
+                    *ray_origin,
+                    Dir3::new(ray_dir.normalize()).unwrap(),
+                    side_ray_distance,
+                    1,
+                    true,
+                    SpatialQueryFilter::default()
+                );
+
+                if !hits.is_empty() {
+                    can_climb = true;
+                    break;
+                }
+            }
+
+            // Calculate movement based on conditions
+            let mut movement = horizontal_direction * sentry.follow_speed * time.delta_seconds();
+            
+            // Only add vertical movement if in contact with a vertical surface
+            if can_climb && vertical_movement.abs() > 0.1 {
+                movement.y = vertical_movement.signum() * sentry.follow_speed * time.delta_seconds();
+            } else {
+                // Apply gravity when not climbing
+                movement.y = -9.81 * time.delta_seconds();
+            }
+
+            // Ground check to prevent sinking
+            let ground_ray = spatial_query.ray_hits(
+                transform.translation,
+                Dir3::NEG_Y,
+                1.0,
+                1,
+                true,
+                SpatialQueryFilter::default()
+            );
+
+            if !ground_ray.is_empty() {
+                movement.y = movement.y.max(0.0);
+            }
+
             transform.translation += movement;
 
             // Update rotation with wobble effect
