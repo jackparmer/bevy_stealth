@@ -27,15 +27,15 @@ use crate::systems::environments::maze::{
     CATWALK_THICKNESS,
 };
 
-const AIRLOCK_POSITION: Vec3 = Vec3::new(779.1837, 2.6249955, -423.27768);
-const GAME_START: Vec3 = Vec3::new(165.00298, 2.6249952, -150.00085);
+use crate::systems::environments::garage::GARAGE_POSITION;
 
-const OUTSIDE: Vec3 = Vec3::new(1102.4198, 2.6249733, -456.37585);
-const REACTOR: Vec3 = Vec3::new(-910.0, 1.6, 1830.0);
+pub const AIRLOCK_POSITION: Vec3 = Vec3::new(779.1837, 2.6249955, -423.27768);
+pub const GAME_START: Vec3 = Vec3::new(165.00298, 2.6249952, -150.00085);
+pub const OUTSIDE: Vec3 = Vec3::new(1102.4198, 2.6249733, -456.37585);
+pub const REACTOR: Vec3 = Vec3::new(-910.0, 1.6, 1830.0);
+pub const ICE_CAVE_POSITION: Vec3 = Vec3::new(-857.4748, -117.847946, 1850.5758);
 
-const ICE_CAVE_POSITION: Vec3 = Vec3::new(-857.4748, -117.847946, 1850.5758);
-
-static MAZE_START: Vec3 = Vec3::new(
+pub static MAZE_START: Vec3 = Vec3::new(
     2700.0 + CELL_SIZE,  // X position (first cell)
     2.625 + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS, // Removed WALL_HEIGHT, adjusted for player height
     2200.0 + CELL_SIZE   // Z position (first cell)
@@ -83,6 +83,11 @@ pub fn teleport_system(
         Some((pos, "Reactor Top"))
     } else if keyboard.just_pressed(KeyCode::KeyM) {
         Some((MAZE_START, "Maze"))
+    } else if keyboard.just_pressed(KeyCode::KeyG) {
+        Some((GARAGE_POSITION, "Garage"))
+    } else if keyboard.just_pressed(KeyCode::KeyH) {
+        let pos = Vec3::new(-718.20593, 2.6249816, -2007.5729);
+        Some((pos, "Ice Cave Entrance"))
     } else {
         None
     };

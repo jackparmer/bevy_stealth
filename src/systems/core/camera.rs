@@ -49,11 +49,11 @@ pub fn rotate_camera(
         for mut camera_transform in camera_query.iter_mut() {
             // Adjust follow offset based on state
             let follow_offset = if protagonist.is_birds_eye {
-                Vec3::new(0.0, 50.0, 0.1) // Birds-eye view (high up, looking straight down)
+                Vec3::new(0.0, 250.0, 0.1) // Birds-eye view (high up, looking straight down)
             } else if protagonist_position.y > 100.0 {
                 Vec3::new(0.0, 30.0, 100.0)
             } else if protagonist.is_driving && !protagonist.is_climbing {
-                Vec3::new(0.0, 20.0, 90.0)  // Driving
+                Vec3::new(0.0, 70.0, 300.0)  // Driving - increased height and distance
             } else if !protagonist.is_driving && protagonist.is_climbing {
                 Vec3::new(0.0, 2.0, 30.0)   // Climbing
             } else {

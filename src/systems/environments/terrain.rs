@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
+use bevy::render::view::RenderLayers;
 use avian3d::prelude::*;
 use avian3d::collision::{ColliderMarker, CollisionLayers, LayerMask, PhysicsLayer};
 use noise::OpenSimplex;
@@ -168,10 +169,11 @@ pub fn spawn_terrain(
             combine_rule: CoefficientCombine::Min,
         })
         .insert(CollisionLayers {
-            memberships: GameLayer::Terrain.into(),  // Terrain layer
-            filters: LayerMask(0b111),  // Can collide with Default, Player, and Terrain
+            memberships: GameLayer::Terrain.into(),
+            filters: LayerMask(0b111),
         })
-        .insert(Terrain { is_icy: false });
+        .insert(Terrain { is_icy: false })
+        .insert(RenderLayers::from_layers(&[0, 1]));
 }
 
 pub fn toggle_terrain_texture(

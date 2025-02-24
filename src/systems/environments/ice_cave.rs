@@ -2,9 +2,6 @@ use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use std::f32::consts::PI;
 use avian3d::prelude::*;
-use bevy::render::mesh::VertexAttributeValues;
-use bevy::render::mesh::Indices;
-use bevy::pbr::{StandardMaterial, NotShadowCaster};
 use fastrand;
 
 pub fn spawn_ice_cave(
@@ -12,300 +9,236 @@ pub fn spawn_ice_cave(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     asset_server: &Res<AssetServer>,
+    time: &Res<Time>,
 ) {
-    let sphere_pos = Vec3::new(-485.0 * 2.0, 2.6249764, -1066.0 * 2.0);
-    let radius = 400.0;
-    let segments = 128; // Reduced from 256 for better performance while maintaining good visual quality
-    let noise_scale = 8.0;
-    let noise_amplitude = 200.0;
-    let opening_size = 0.5;
-    let cube_size = 80.0;
+    let position = Vec3::new(-485.0 * 2.0, 2.6249764, -1066.0 * 2.0);
+    let radius = 300.0;
+    let wall_thickness = 200.0;  // Thicker walls for crystal embedding
+    let height = 2400.0;
 
-    let perlin = Perlin::new(42);
+    // Main cylinder
+    let cylinder_mesh = meshes.add(Extrusion::new(
+        Annulus {
+            inner_circle: Circle::new(radius),
+            outer_circle: Circle::new(radius + wall_thickness),
+        },
+        height,
+    ));
 
-    // Pre-allocate vectors with capacity
-    let estimated_vertex_count = (segments + 1) * (segments + 1);
-    let mut vertices = Vec::with_capacity(estimated_vertex_count);
-    let mut normals = Vec::with_capacity(estimated_vertex_count);
-    let mut uvs = Vec::with_capacity(estimated_vertex_count);
-    let mut vertex_map = vec![vec![-1i32; segments as usize + 1]; segments as usize + 1];
-
-    // Generate vertices
-    let mut vertex_count = 0;
-    for lat in 0..=segments {
-        for lon in 0..=segments {
-            let theta = (lat as f32 * PI) / segments as f32;
-            let phi = (lon as f32 * 2.0 * PI) / segments as f32;
-            
-            // Skip vertices to create a hole facing the terrain
-            if phi > 1.5 * PI && phi < 1.5 * PI + opening_size * PI && 
-               theta > PI * 0.3 && theta < PI * 0.7 {
-                vertex_map[lat as usize][lon as usize] = -1;
-                continue;
-            }
-            
-            let x = theta.sin() * phi.cos();
-            let y = theta.cos();
-            let z = theta.sin() * phi.sin();
-
-            // Apply noise deformation
-            let noise_input = [
-                x as f64 * noise_scale as f64,
-                y as f64 * noise_scale as f64,
-                z as f64 * noise_scale as f64,
-            ];
-            let noise_value = perlin.get(noise_input) as f32;
-            
-            let deformed_radius = radius + noise_value * noise_amplitude;
-            let vertex = Vec3::new(
-                x * deformed_radius,
-                y * deformed_radius,
-                z * deformed_radius,
-            );
-
-            vertices.push(vertex);
-            normals.push(vertex.normalize());
-            uvs.push([lon as f32 / segments as f32, lat as f32 / segments as f32]);
-            
-            vertex_map[lat as usize][lon as usize] = vertex_count;
-            vertex_count += 1;
-        }
-    }
-
-    // Pre-allocate indices vector with estimated capacity
-    let estimated_index_count = segments as usize * segments as usize * 6;
-    let mut indices = Vec::with_capacity(estimated_index_count);
-
-    // Generate indices
-    for lat in 0..segments {
-        for lon in 0..segments {
-            let tl = vertex_map[lat as usize][lon as usize];
-            let tr = vertex_map[lat as usize][(lon + 1) as usize];
-            let bl = vertex_map[(lat + 1) as usize][lon as usize];
-            let br = vertex_map[(lat + 1) as usize][(lon + 1) as usize];
-            
-            // Only create triangles if all vertices exist
-            if tl >= 0 && tr >= 0 && bl >= 0 && br >= 0 {
-                indices.extend_from_slice(&[
-                    tl as u32, bl as u32, tr as u32,
-                    tr as u32, bl as u32, br as u32,
-                ]);
-            }
-        }
-    }
-
-    // Create the mesh
-    let mut mesh = Mesh::new(
-        bevy::render::render_resource::PrimitiveTopology::TriangleList,
-        bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
-    );
-
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, 
-        VertexAttributeValues::Float32x3(vertices.iter().map(|v| [v.x, v.y, v.z]).collect()));
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, 
-        VertexAttributeValues::Float32x3(normals.iter().map(|n| [n.x, n.y, n.z]).collect()));
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs));
-    mesh.insert_indices(Indices::U32(indices.clone()));
-
-    // Create material with a rocky texture - adjusted for better interior lighting
+    // Create material for the ice cave walls
     let material = materials.add(StandardMaterial {
-        base_color_texture: None,
-        base_color: Color::srgb(0.01, 0.01, 0.01),  // Nearly pure black
-        perceptual_roughness: 0.5,  // More roughness to reduce reflections
-        metallic: 0.2,  // Much less metallic
+        base_color: Color::srgb(0.01, 0.01, 0.01),
+        perceptual_roughness: 0.5,
+        metallic: 0.2,
         double_sided: true,
         cull_mode: None,
         unlit: false,
-        reflectance: 0.1,  // Minimal reflectance
-        emissive: Color::srgb(0.0, 0.0, 0.0).into(),
-        alpha_mode: AlphaMode::Opaque,  // Ensure fully opaque
+        reflectance: 0.1,
         ..default()
     });
 
-    // Spawn the deformed sphere with collision
+    // Spawn main cylinder
     commands.spawn((
         PbrBundle {
-            mesh: meshes.add(mesh),
-            material,
-            transform: Transform::from_translation(sphere_pos),
+            mesh: cylinder_mesh,
+            material: material.clone(),
+            transform: Transform::from_translation(position)
+                .with_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)), // Lay on side
             ..default()
         },
-        Collider::trimesh(vertices.clone(), indices.chunks(3).map(|chunk| [chunk[0], chunk[1], chunk[2]]).collect()),
-        ColliderDensity(1.0),
         RigidBody::Static,
+        ColliderConstructor::TrimeshFromMesh,
     ));
 
-    // Generate vertices for cube positions (but don't create the sphere mesh)
-    let mut vertices: Vec<Vec3> = Vec::new();
-    
-    for lat in 0..=segments {
-        for lon in 0..=segments {
-            let theta = (lat as f32 * PI) / segments as f32;
-            let phi = (lon as f32 * 2.0 * PI) / segments as f32;
-            
-            // Skip vertices to create a hole facing the terrain
-            if phi > 1.5 * PI && phi < 1.5 * PI + opening_size * PI && 
-               theta > PI * 0.3 && theta < PI * 0.7 {
-                continue;
-            }
-            
-            let x = theta.sin() * phi.cos();
-            let y = theta.cos();
-            let z = theta.sin() * phi.sin();
-
-            // Apply noise deformation
-            let noise_input = [
-                x as f64 * noise_scale as f64,
-                y as f64 * noise_scale as f64,
-                z as f64 * noise_scale as f64,
-            ];
-            let noise_value = perlin.get(noise_input) as f32;
-            
-            let deformed_radius = radius + noise_value * noise_amplitude;
-            vertices.push(Vec3::new(
-                x * deformed_radius,
-                y * deformed_radius,
-                z * deformed_radius,
-            ));
-        }
-    }
-
-    // Spawn cubes more efficiently
-    let cube_spawn_interval = 12; // Increased from 6 to spawn fewer cubes
-    for (i, vertex) in vertices.iter().enumerate() {
-        if i % cube_spawn_interval != 0 {
-            continue;
-        }
-
-        let direction = -vertex.normalize();
-        let position = sphere_pos + *vertex + (direction * (cube_size / 2.0));
-
-        let radius_variation = cube_size * (0.8 + fastrand::f32() * 0.4);
-        let hue_variation = Color::hsl(
-            220.0 + fastrand::f32() * 40.0,  // blue-purple hue range: 220-260
-            0.6 + fastrand::f32() * 0.3,     // medium-high saturation: 0.6-0.9
-            0.5 + fastrand::f32() * 0.3,     // medium-high lightness: 0.5-0.8
-        );
-        let emissive_strength = 0.2 + fastrand::f32() * 0.4; // Stronger emissive between 0.2 and 0.6
-
-        let texture_path = if fastrand::f32() < 0.5 {
-            "textures/snow_01_diff_4k.png"
-        } else {
-            "textures/snow_02_diff_4k.png"
-        };
-
-        commands.spawn(PbrBundle {
-            mesh: meshes.add(Cuboid::new(
-                radius_variation,
-                radius_variation * (0.3 + fastrand::f32() * 0.4),
-                radius_variation * (0.5 + fastrand::f32() * 0.5)
-            )),
-            material: materials.add(StandardMaterial {
-                base_color: hue_variation,
-                metallic: 0.9,                // Increased metallic for crystal shine
-                perceptual_roughness: 0.1,    // Decreased roughness for more shine
-                reflectance: 0.8,             // Increased reflectance
-                emissive: Color::srgb(
-                    emissive_strength * 0.2,  // Slight red
-                    emissive_strength * 0.4,  // Medium blue
-                    emissive_strength         // Strong blue/purple
-                ).into(),
-                base_color_texture: Some(asset_server.load(texture_path)),
-                uv_transform: if fastrand::bool() { 
-                    StandardMaterial::FLIP_HORIZONTAL 
-                } else { 
-                    StandardMaterial::FLIP_VERTICAL 
-                },
-                ..default()
-            }),
-            transform: Transform::from_translation(position)
-                .looking_to(direction, Vec3::Y)
-                .with_rotation(Quat::from_rotation_y(fastrand::f32() * PI * 2.0)
-                    * Quat::from_rotation_x(fastrand::f32() * PI * 0.5)),
+    // Replace spotlights with point lights
+    commands.spawn(PointLightBundle {
+        point_light: PointLight {
+            color: Color::rgb(0.9, 0.95, 1.0),
+            intensity: 100000.0,
+            range: radius * 4.0,
+            shadows_enabled: true,
             ..default()
-        });
-    }
+        },
+        transform: Transform::from_translation(position + Vec3::new(-height * 0.25, 0.0, 0.0)),
+        ..default()
+    });
 
-    // Spawn water feature at a position relative to the cave entrance
-    let water_feature_pos = sphere_pos + Vec3::new(
-        radius * 0.3, // Slightly offset from center
-        -radius * 0.4, // Lower in the cave
-        radius * 0.7, // Towards the entrance
-    );
-    spawn_water_feature(commands, meshes, materials, water_feature_pos);
-}
+    commands.spawn(PointLightBundle {
+        point_light: PointLight {
+            color: Color::rgb(0.9, 0.95, 1.0),
+            intensity: 100000.0,
+            range: radius * 4.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_translation(position + Vec3::new(height * 0.25, 0.0, 0.0)),
+        ..default()
+    });
 
-pub fn spawn_water_feature(
-    commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
-    basin_pos: Vec3,
-) {
-    // Dimensions
-    let wall_height = 0.5;  // 5x lower (was 2.5)
-    let wall_thickness = 4.0;
-    let basin_width = 60.0;  // 3x bigger (was 20.0)
-    
-    // Wall configurations: (is_vertical, offset_x, offset_z)
-    let wall_configs = [
-        (false,  0.0,  basin_width/2.0),  // North
-        (false,  0.0, -basin_width/2.0),  // South
-        (true,   basin_width/2.0,  0.0),  // East
-        (true,  -basin_width/2.0,  0.0),  // West
-    ];
+    // Spawn crystals around the cylinder
+    let perlin = Perlin::new(42);
+    let segments = 64;
+    let height_segments = 96;
+    let cube_size = 80.0;
 
-    // Spawn walls
-    for (is_vertical, offset_x, offset_z) in wall_configs {
-        let (width, depth) = if is_vertical {
-            (wall_thickness, basin_width)
-        } else {
-            (basin_width, wall_thickness)
-        };
+    for h in 0..height_segments {
+        for s in 0..segments {
+            if fastrand::f32() > 0.3 { continue; } // Reduce crystal density
 
-        commands.spawn((
-            PbrBundle {
-                mesh: meshes.add(Cuboid::new(width, wall_height, depth)),
+            let angle = (s as f32 * 2.0 * PI) / segments as f32;
+            let height_offset = (h as f32 * height) / height_segments as f32 - height / 2.0;
+            
+            // Position crystals on the inner surface, matching cylinder's Z-rotation
+            let direction = Vec3::new(
+                angle.cos(),
+                angle.sin(),
+                0.0
+            ).normalize();
+
+            let base_pos = Vec3::new(
+                angle.cos() * radius,
+                angle.sin() * radius,
+                height_offset  // Z is now height
+            );
+            
+            let crystal_pos = position + base_pos;
+
+            // Rest of crystal spawning code remains the same, but remove the direction calculation
+            let radius_variation = cube_size * (0.8 + fastrand::f32() * 0.4);
+            let y_normalized = (base_pos.y - (-radius)) / (radius * 2.0);
+            let hue = 180.0 + y_normalized * 60.0;
+
+            let hue_variation = Color::hsl(
+                hue + fastrand::f32() * 5.0,
+                0.8 + fastrand::f32() * 0.15,
+                0.15 + fastrand::f32() * 0.15,
+            );
+            let emissive_strength = 0.1 + fastrand::f32() * 0.2;
+
+            commands.spawn(PbrBundle {
+                mesh: meshes.add(Cuboid::new(
+                    radius_variation,
+                    radius_variation * (0.3 + fastrand::f32() * 0.4),
+                    radius_variation * (0.5 + fastrand::f32() * 0.5)
+                )),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::srgba(0.0, 0.0, 0.0, 1.0),  // Pure black
-                    perceptual_roughness: 0.1,  // More shiny
-                    metallic: 0.9,  // More metallic
+                    base_color: hue_variation,
+                    metallic: 0.9,
+                    perceptual_roughness: 0.1,
+                    reflectance: 0.8,
+                    emissive: Color::hsl(
+                        hue + fastrand::f32() * 5.0,
+                        0.8 + fastrand::f32() * 0.15,
+                        emissive_strength,
+                    ).into(),
+                    base_color_texture: Some(asset_server.load("textures/amethyst.png")),
                     ..default()
                 }),
-                transform: Transform::from_translation(
-                    basin_pos + Vec3::new(offset_x, 0.0, offset_z)
-                ),
+                transform: Transform::from_translation(crystal_pos)
+                    .looking_to(direction, Vec3::Z)
+                    .with_rotation(
+                        Quat::from_rotation_x(fastrand::f32() * PI) *
+                        Quat::from_rotation_y(fastrand::f32() * PI) *
+                        Quat::from_rotation_z(fastrand::f32() * PI)
+                    ),
                 ..default()
-            },
-            RigidBody::Static,
-            Collider::cuboid(width/2.0, wall_height/2.0, depth/2.0),
-        ));
+            });
+        }
     }
 
-    // Water surface (simple flat rectangle)
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(basin_width - 0.67, 0.033, basin_width - 0.67)),
-        material: materials.add(StandardMaterial {
-            base_color: Color::srgba(0.0, 0.8, 1.0, 0.8),
-            emissive: Color::srgba(0.0, 1.0, 2.0, 1.0).into(),
-            alpha_mode: AlphaMode::Blend,
-            ..default()
-        }),
-        transform: Transform::from_translation(basin_pos + Vec3::new(0.0, wall_height - 0.2, 0.0)),
+    // Add particle emitters along the cylinder
+    let particle_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.7, 0.8, 1.0), // Added blue tint
+        emissive: Color::srgb(1.4, 1.6, 4.0).into(), // Much brighter, especially in blue channel
+        unlit: true,
+        alpha_mode: AlphaMode::Blend,
         ..default()
-    })
-    .insert(NotShadowCaster);
+    });
 
-    // Replace spotlight with emissive cuboid for god ray effect
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(4.0, 400.0, 4.0)),  // Tall, thin cuboid
-        material: materials.add(StandardMaterial {
-            base_color: Color::rgba(0.4, 0.8, 1.0, 0.15),  // Bright blue, mostly transparent
-            emissive: Color::rgb(0.4, 0.8, 1.0).into(),   // Bright blue glow
-            alpha_mode: AlphaMode::Blend,
-            ..default()
-        }),
-        transform: Transform::from_translation(basin_pos + Vec3::new(0.0, 200.0, 0.0)),  // Center height of the beam
-        ..default()
-    })
-    .insert(NotShadowCaster);  // Ensure it doesn't cast shadows
+    let particle_mesh = meshes.add(Mesh::from(Sphere { radius: 0.1 })); // 10x smaller
+
+    // Increase particle count for density
+    for _ in 0..20000 { // Doubled particle count
+        let random_speed = 5.0 + fastrand::f32() * 5.0; // Reduced speed by 4x
+        
+        commands.spawn((
+            PbrBundle {
+                mesh: particle_mesh.clone(),
+                material: particle_material.clone(),
+                transform: Transform::from_translation(position),
+                ..default()
+            },
+            IceCaveParticle {
+                velocity: Vec3::new(0.0, random_speed, 0.0),
+                origin: position,
+                start_time: time.elapsed_seconds(),
+            },
+        ));
+    }
+}
+
+// Add this component
+#[derive(Component)]
+pub struct IceCaveParticle {
+    velocity: Vec3,
+    origin: Vec3,
+    start_time: f32,
+}
+
+// Add this system to your main.rs
+pub fn update_ice_particles(
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut Transform, &mut IceCaveParticle)>,
+) {
+    for (_, mut transform, particle) in query.iter_mut() {
+        let effect_age = time.elapsed_seconds() - particle.start_time;
+        
+        // Vertical rising motion with increased diffusion based on height
+        let height = transform.translation.y - particle.origin.y;
+        let height_fraction = (height / 300.0).clamp(0.0, 1.0);
+        
+        // Softer, more organic radial expansion - 20x wider
+        let base_angle = effect_age * 0.5 + fastrand::f32() * PI * 2.0;
+        let expansion_rate = height_fraction.powf(0.5) * 4000.0; // Increased from 200 to 4000
+        
+        // Add swirling motion that increases with height
+        let swirl_angle = base_angle + height_fraction * PI * 2.0;
+        let swirl_radius = expansion_rate * (1.0 + (effect_age * 0.5).sin() * 0.3);
+        
+        let radial_offset = Vec3::new(
+            swirl_angle.cos() * swirl_radius,
+            0.0,
+            swirl_angle.sin() * swirl_radius
+        );
+        
+        // Increased turbulence scales
+        let fast_turbulence = Vec3::new(
+            (effect_age * 3.0).sin() * 100.0, // 20x larger
+            (effect_age * 2.5).cos() * 60.0,
+            (effect_age * 2.8).sin() * 100.0
+        );
+        
+        let slow_turbulence = Vec3::new(
+            (effect_age * 0.8 + height * 0.02).sin() * 300.0 * height_fraction, // 20x larger
+            (effect_age * 0.6).cos() * 200.0 * height_fraction,
+            (effect_age * 0.7 + height * 0.02).sin() * 300.0 * height_fraction
+        );
+        
+        // Combine movements with smoother transitions
+        transform.translation += 
+            particle.velocity * 1.0 - height_fraction * 0.5 +
+            radial_offset * time.delta_seconds() * 0.3 +
+            fast_turbulence * time.delta_seconds() +
+            slow_turbulence * time.delta_seconds();
+        
+        // Reset when too high or too far from center
+        let horizontal_distance = Vec2::new(
+            transform.translation.x - particle.origin.x,
+            transform.translation.z - particle.origin.z
+        ).length();
+        
+        if height > 300.0 || horizontal_distance > 300.0 {
+            transform.translation = particle.origin;
+        }
+    }
 }

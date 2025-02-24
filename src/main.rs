@@ -14,8 +14,14 @@ use systems::core::camera::rotate_camera;
 use systems::core::input::keyboard_animation_control;
 use systems::core::timer::{setup_debug_timer, print_protagonist_transform};
 use systems::core::minimap::{setup_minimap, update_minimap, update_sentry_markers};
+use systems::core::screenplay::{setup_screenplay, screenplay_system};
 
-use systems::player::climbing::{handle_climbing, climbing_keyboard_control, check_ladder_presence, handle_ladder_top};
+use systems::player::climbing::{
+    handle_climbing, 
+    climbing_keyboard_control, 
+    check_ladder_presence, 
+    handle_ladder_top,
+};
 use systems::player::swimming::swimming_system;
 use systems::player::driving::{toggle_driving, driving_control};
 use systems::player::teleports::teleport_system;
@@ -28,6 +34,8 @@ use systems::environments::airlock::{spawn_airlock, handle_airlock_teleport, bli
 use systems::environments::tram::move_tram;
 use systems::environments::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
 use systems::environments::maze::spawn_maze;
+use systems::environments::ice_cave::update_ice_particles;
+use systems::environments::garage::spawn_garage;
 
 use systems::core::sentry::{
     spawn_sentry,
@@ -46,7 +54,6 @@ use bevy::{
     prelude::*,
 };
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
-
 use std::f32::consts::*;
 use std::time::Duration;
 
@@ -62,6 +69,7 @@ fn main() {
             setup,
             setup_explosion_materials,
             spawn_sentry,
+            spawn_garage,
         ).chain())
         .add_systems(Startup, spawn_maze)
         .add_systems(Startup, spawn_terrain)
@@ -106,6 +114,9 @@ fn main() {
             update_minimap,
             update_sentry_markers,
         ))
+        .add_systems(Startup, setup_screenplay)
+        .add_systems(Update, screenplay_system)
+        .add_systems(Update, update_ice_particles)
         .run();
 }
 

@@ -1,6 +1,7 @@
 use bevy::{
     prelude::*,
     render::camera::Viewport,
+    render::view::RenderLayers,
 };
 use crate::components::Protagonist;
 use crate::components::Sentry;
@@ -44,7 +45,7 @@ pub fn setup_minimap(
                     physical_size: UVec2::new(400, 400),
                     ..default()
                 }),
-                order: 1,
+                order: 2,
                 ..default()
             },
             transform: Transform::from_xyz(0.0, MINIMAP_CAMERA_HEIGHT, 0.0)
@@ -53,6 +54,7 @@ pub fn setup_minimap(
         },
         MinimapCamera,
         Visibility::Hidden,
+        RenderLayers::layer(1),
     ));
 
     // Spawn red dot for protagonist (initially hidden)
@@ -72,6 +74,7 @@ pub fn setup_minimap(
             ..default()
         },
         MinimapMarker,
+        RenderLayers::layer(1),
     ));
 
     // Add shared mesh and material resources for sentry markers
@@ -92,67 +95,51 @@ pub fn update_minimap(
         Query<&mut Transform, (With<MinimapCamera>, Without<Protagonist>, Without<MinimapMarker>)>,
         Query<&mut Transform, (With<MinimapMarker>, Without<MinimapCamera>, Without<Protagonist>)>,
         Query<&mut Camera, With<MinimapCamera>>,
-        Query<&mut Visibility, With<MinimapMarker>>,
+        Query<&mut Visibility, (With<MinimapMarker>, Without<Protagonist>)>,
     )>,
     time: Res<Time>,
 ) {
-    if let Ok((player_transform, protagonist)) = protagonist_query.get_single() {
-        // Determine if minimap should be visible
-        let should_show_minimap = protagonist.is_outside 
-            && !protagonist.is_swimming
-            && !protagonist.is_dirigible;
-
-        // Update camera viewport
+    if let Ok((player_transform, _protagonist)) = protagonist_query.get_single() {
+        // Always show minimap
         for mut camera in param_set.p2().iter_mut() {
-            camera.viewport = if should_show_minimap {
-                Some(Viewport {
-                    physical_position: UVec2::new(0, 0),
-                    physical_size: UVec2::new(400, 400),
-                    ..default()
-                })
-            } else {
-                None
-            };
+            camera.viewport = Some(Viewport {
+                physical_position: UVec2::new(0, 0),
+                physical_size: UVec2::new(400, 400),
+                ..default()
+            });
         }
 
-        // Update ALL minimap markers visibility (including sentry markers)
+        // Always show markers
         for mut visibility in param_set.p3().iter_mut() {
-            *visibility = if should_show_minimap {
-                Visibility::Visible
-            } else {
-                Visibility::Hidden
-            };
+            *visibility = Visibility::Visible;
         }
 
-        // Only update positions if minimap is visible
-        if should_show_minimap {
-            // Update camera position with smoothing
-            for mut camera_transform in param_set.p0().iter_mut() {
-                let target_pos = Vec3::new(
-                    (player_transform.translation.x * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
-                    (player_transform.translation.y + MINIMAP_CAMERA_HEIGHT).round(),
-                    (player_transform.translation.z * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
-                );
-                
-                camera_transform.translation = camera_transform.translation.lerp(
-                    target_pos,
-                    time.delta_seconds() * MINIMAP_SMOOTHING_SPEED,
-                );
-            }
+        // Update camera position with smoothing
+        for mut camera_transform in param_set.p0().iter_mut() {
+            let target_pos = Vec3::new(
+                (player_transform.translation.x * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
+                (player_transform.translation.y + MINIMAP_CAMERA_HEIGHT).round(),
+                (player_transform.translation.z * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
+            );
+            
+            camera_transform.translation = camera_transform.translation.lerp(
+                target_pos,
+                time.delta_seconds() * MINIMAP_SMOOTHING_SPEED,
+            );
+        }
 
-            // Update marker position with the same smoothing
-            for mut marker_transform in param_set.p1().iter_mut() {
-                let target_pos = Vec3::new(
-                    (player_transform.translation.x * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
-                    (player_transform.translation.y + MINIMAP_MARKER_HEIGHT).round(),
-                    (player_transform.translation.z * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
-                );
-                
-                marker_transform.translation = marker_transform.translation.lerp(
-                    target_pos,
-                    time.delta_seconds() * MINIMAP_SMOOTHING_SPEED,
-                );
-            }
+        // Update marker position with the same smoothing
+        for mut marker_transform in param_set.p1().iter_mut() {
+            let target_pos = Vec3::new(
+                (player_transform.translation.x * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
+                (player_transform.translation.y + MINIMAP_MARKER_HEIGHT).round(),
+                (player_transform.translation.z * MINIMAP_POSITION_PRECISION).round() / MINIMAP_POSITION_PRECISION,
+            );
+            
+            marker_transform.translation = marker_transform.translation.lerp(
+                target_pos,
+                time.delta_seconds() * MINIMAP_SMOOTHING_SPEED,
+            );
         }
     }
 }

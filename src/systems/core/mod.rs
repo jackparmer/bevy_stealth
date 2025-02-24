@@ -4,3 +4,4 @@ pub mod camera;
 pub mod input;
 pub mod minimap;
 pub mod sentry;
+pub mod screenplay;

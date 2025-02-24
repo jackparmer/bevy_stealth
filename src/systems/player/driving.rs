@@ -5,18 +5,29 @@ use crate::components::Protagonist;
 
 pub fn toggle_driving(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(Entity, &mut Protagonist, &mut Handle<Scene>)>,
+    mut query: Query<(Entity, &mut Protagonist, &mut Handle<Scene>, &mut Transform)>,
+    mut camera_query: Query<&mut Transform, (With<Camera>, Without<Protagonist>)>,
     asset_server: Res<AssetServer>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyT) {
-        for (_, mut protagonist, mut scene) in query.iter_mut() {
+        for (_, mut protagonist, mut scene, mut transform) in query.iter_mut() {
             // Toggle driving state
             protagonist.is_driving = !protagonist.is_driving;
             
-            // Update the model based on driving state
+            // Update the model and camera based on driving state
             *scene = if protagonist.is_driving {
+                transform.scale = Vec3::splat(3.0);
+                // Adjust camera position for tank view
+                if let Ok(mut camera_transform) = camera_query.get_single_mut() {
+                    camera_transform.translation = Vec3::new(0.0, 15.0, 25.0); // Higher and further back
+                }
                 asset_server.load("models/KB03-apc.glb#Scene0")
             } else {
+                transform.scale = Vec3::ONE;
+                // Reset camera position for protagonist view
+                if let Ok(mut camera_transform) = camera_query.get_single_mut() {
+                    camera_transform.translation = Vec3::new(0.0, 5.0, 8.0); // Normal following distance
+                }
                 asset_server.load("models/Protagonist.glb#Scene0")
             };
         }

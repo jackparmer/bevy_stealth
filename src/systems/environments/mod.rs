@@ -8,3 +8,4 @@ pub mod ice_cave;
 pub mod launch_silo;
 pub mod reactor;
 pub mod maze;
+pub mod garage;

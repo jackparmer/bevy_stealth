@@ -212,8 +212,9 @@ fn teleport_player(
         AIRLOCK_POSITION.x - AIRLOCK_LENGTH/2.0 - AIRLOCK_TELEPORT_OFFSET
     };
 
-    // Keep current y and z, only update x
+    // Keep current z, update x and add vertical offset
     player_transform.translation.x = target_x;
+    player_transform.translation.y += 5.0;  // Add 5 units of vertical offset
 
     // Preserve vertical and lateral movement, only zero out forward velocity
     if let Ok(mut linear_velocity) = velocity_query.get_single_mut() {

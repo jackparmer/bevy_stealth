@@ -8,6 +8,7 @@ use crate::systems::core::setup::PROTAGONIST_START;
 use std::f32::consts::PI;
 use std::time::Duration;
 use crate::systems::core::minimap::{MinimapMarker, SentryMinimapMarker, MinimapResources, MINIMAP_MARKER_HEIGHT};
+use bevy::render::view::RenderLayers;
 
 const SENTRY_SPAWN_INTERVAL: f32 = 2.0; // Time in seconds between sentry spawns
 
@@ -226,7 +227,7 @@ fn spawn_sentry_at(
         ));
     }).id();
 
-    // Update minimap marker to use ground position
+    // Update minimap marker to use ground position and include RenderLayers
     commands.spawn((
         PbrBundle {
             mesh: minimap_resources.sentry_mesh.clone(),
@@ -240,6 +241,7 @@ fn spawn_sentry_at(
         },
         MinimapMarker,
         SentryMinimapMarker(sentry_entity),
+        RenderLayers::layer(1), // Add RenderLayers component
     ));
 
     true

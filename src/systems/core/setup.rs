@@ -14,6 +14,7 @@ use bevy::{
 use rand::Rng;
 use bevy::math::Vec3;
 use bevy::render::texture::{ImageSampler, ImageAddressMode, ImageSamplerDescriptor};
+use bevy::render::view::RenderLayers;
 
 // Constants for structure dimensions
 
@@ -89,6 +90,10 @@ pub fn setup(
 
     commands.spawn((
         Camera3dBundle {
+            camera: Camera {
+                order: 99,  // Explicitly set main camera to render first
+                ..default()
+            },
             transform: Transform::from_xyz(0.7, 0.7, 10.0)
                 .looking_at(Vec3::new(0.0, 0.3, 0.0), Vec3::Y),
             ..default()
@@ -279,6 +284,7 @@ pub fn setup(
             transform: Transform::from_translation(PROTAGONIST_START.position),
             ..default()
         },
+        RenderLayers::from_layers(&[0, 1]),
         Name::new("Protagonist"),
     ));
 
@@ -363,6 +369,7 @@ pub fn setup(
             transform: Transform::from_xyz(0.0,0.0, 0.0), 
             ..default()
         },
+        RenderLayers::from_layers(&[0, 1]),
         Name::new("Tundra"),
     ));   
 
@@ -477,7 +484,7 @@ pub fn setup(
         },
     );   
 
-    spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server);
+    spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server, &time);
 
     spawn_reactor(&mut commands, &mut meshes, &mut materials, &asset_server);
 }
