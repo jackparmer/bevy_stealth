@@ -4,6 +4,9 @@ use crate::systems::environments::ladder::{spawn_ladder, LadderConfig};
 use crate::systems::environments::ice_cave::spawn_ice_cave;
 use crate::systems::environments::launch_silo::spawn_launch_silo;
 use crate::systems::environments::reactor::spawn_reactor;
+use crate::systems::environments::glaciers::spawn_glaciers;
+use crate::components::Sentry;
+use crate::systems::core::sentry::SentryTiming;
 
 use avian3d::prelude::*;
 use bevy::{
@@ -11,7 +14,6 @@ use bevy::{
     prelude::*,
 };
 
-use rand::Rng;
 use bevy::math::Vec3;
 use bevy::render::texture::{ImageSampler, ImageAddressMode, ImageSamplerDescriptor};
 use bevy::render::view::RenderLayers;
@@ -33,7 +35,7 @@ pub const BRIDGE_POSITION: Vec3 = Vec3::new(100.0, 394.99, 100.0);
 
 pub const TRAM_POSITION: Vec3 = Vec3::new(100.0, 245.5, 100.0);
 
-pub const WORLD_RADIUS: f32 = 5000.0;
+pub const WORLD_RADIUS: f32 = 10000.0;
 
 pub const TOWER_LADDER_START: Vec3 = Vec3::new(214.0, 200.0, 200.0);
 
@@ -98,13 +100,13 @@ pub fn setup(
                 .looking_at(Vec3::new(0.0, 0.3, 0.0), Vec3::Y),
             ..default()
         },
-        /*
+
         EnvironmentMapLight {
-            diffuse_map: asset_server.load("environment_maps/diffuse_rgb9e5_zstd.ktx2"),
-            specular_map: asset_server.load("environment_maps/specular_rgb9e5_zstd.ktx2"),
-            intensity: 250.0,
+            diffuse_map: asset_server.load("environment_maps/pisa_diffuse_rgb9e5_zstd.ktx2"),
+            specular_map: asset_server.load("environment_maps/pisa_specular_rgb9e5_zstd.ktx2"),
+            intensity: 25.0,
         }
-        */
+
     ));
 
     // Add Ambient Light
@@ -216,41 +218,8 @@ pub fn setup(
         RigidBody::Static,
     ));
 
-
-    // Glaciers
-
-    let mut rng_glacier = rand::thread_rng();
-
-    for _ in 0..30 {
-        // Generate a random position between tundra and acquifier floor
-        let distance = rng_glacier.gen_range(100.0..WORLD_RADIUS);
-        let y = rng_glacier.gen_range(-950.0..-50.0); // Fixed: start < end
-        let angle = rng_glacier.gen_range(0.0..std::f32::consts::TAU);
-        let x = distance * angle.cos();
-        let z = distance * angle.sin();
-    
-        // Random rotation and scale
-        let rotation = Quat::from_euler(
-            EulerRot::XYZ,
-            rng_glacier.gen_range(-0.2..0.2),
-            rng_glacier.gen_range(0.0..std::f32::consts::TAU),
-            rng_glacier.gen_range(-0.2..0.2),
-        );
-        let scale = rng_glacier.gen_range(1.0..15.0);
-    
-        commands.spawn((
-            SceneBundle {
-                scene: asset_server
-                    .load(GltfAssetLabel::Scene(0).from_asset("python/Tall_Monolithic_Rock.glb")),
-                transform: Transform::from_xyz(x, y, z)
-                    .with_rotation(rotation)
-                    .with_scale(Vec3::splat(scale)),
-                ..default()
-            },
-            ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMesh),
-            RigidBody::Static,
-        ));
-    }
+    // Replace the glacier generation code with:
+    spawn_glaciers(&mut commands, &asset_server);
 
     // Replace the wall spawning code with:
     spawn_launch_silo(&mut commands, &mut meshes, &mut materials, &asset_server);
@@ -487,4 +456,47 @@ pub fn setup(
     spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server, &time);
 
     spawn_reactor(&mut commands, &mut meshes, &mut materials, &asset_server);
+
+    // Add initial sentry near protagonist start position
+    let initial_sentry_pos = Vec3::new(
+        PROTAGONIST_START.position.x + 100.0,
+        PROTAGONIST_START.position.y,
+        PROTAGONIST_START.position.z
+    );
+    
+    commands.spawn((
+        SceneBundle {       
+            scene: asset_server
+                .load(GltfAssetLabel::Scene(0)
+                .from_asset("models/tmpn3hy22ev.glb")),
+            transform: Transform::from_translation(initial_sentry_pos)
+                .with_scale(Vec3::splat(1.0)),
+            ..default()
+        },
+        Sentry {
+            view_distance: 500.0,
+            view_angle: std::f32::consts::PI / 2.0,
+            follow_speed: 10.0,
+            velocity: Vec3::ZERO,
+        },
+        Name::new("InitialSentry"),
+        SentryTiming {
+            time_offset: rand::random::<f32>() * 100.0,
+        },
+    )).with_children(|parent| {
+        // Add eerie spotlight as child of sentry
+        parent.spawn(SpotLightBundle {
+            transform: Transform::from_xyz(0.0, 10.0, 0.0)
+                .looking_at(Vec3::ZERO, Vec3::Y),
+            spot_light: SpotLight {
+                intensity: 300000000.0, // Bright!
+                color: Color::srgb(0.1, 0.3, 0.8), // Cool blue color
+                outer_angle: 0.4, // Narrow beam
+                inner_angle: 0.2,
+                shadows_enabled: true,
+                ..default()
+            },
+            ..default()
+        });
+    });
 }

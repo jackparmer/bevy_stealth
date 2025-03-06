@@ -10,6 +10,43 @@ use bevy::{
 use avian3d::prelude::*;
 use std::time::Duration;
 
+// Movement constants
+const TURN_SPEED: f32 = 3.0;  // Radians per second
+const MOVE_SPEED: f32 = 20.0;  // Base units per second
+const RUN_SPEED: f32 = 80.0;  // Base running speed
+const STRAFE_SPEED: f32 = 4.0;  // Base strafing speed
+const UNDERWATER_SPEED: f32 = 80.0;  // Underwater movement speed
+
+// Height-related constants
+const HEIGHT_THRESHOLD: f32 = 100.0;
+const HEIGHT_MULTIPLIER_HIGH: f32 = 2.0;
+const HEIGHT_MULTIPLIER_NORMAL: f32 = 1.0;
+
+// Swimming speed multipliers
+const SWIM_SPEED_BOOST: f32 = 20.0;
+const SWIM_SPEED_NORMAL: f32 = 10.0;
+const SWIM_SPEED_BACKWARD_MULTIPLIER: f32 = 0.25;  // 4x slower for backward swimming
+const SWIM_SPEED_VERTICAL_MULTIPLIER: f32 = 0.25;  // 4x slower for vertical swimming
+
+// Teleportation distances
+const TELEPORT_DOWN_DISTANCE: f32 = 10.0;
+const TELEPORT_UP_DISTANCE: f32 = 15.0;
+
+// Jump impulse values
+const JUMP_BASE_IMPULSE: f32 = 5.0;
+const JUMP_FORWARD_NORMAL: f32 = 2.0;
+const JUMP_FORWARD_RUNNING: f32 = 4.0;
+const JUMP_VERTICAL_RUNNING: f32 = 12.5;
+
+// Animation transition duration
+const ANIMATION_TRANSITION_MS: u64 = 250;
+
+// Lighting values
+const NIGHT_ILLUMINANCE: f32 = 10.0;
+const ALARM_ILLUMINANCE: f32 = 1000.0;
+const NIGHT_COLOR: Color = Color::rgb(0.2, 0.2, 0.3);
+const ALARM_COLOR: Color = Color::rgb(1.0, 0.0, 0.0);
+
 pub fn keyboard_animation_control(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut impulse_query: Query<&mut ExternalImpulse, With<Protagonist>>,
@@ -21,18 +58,28 @@ pub fn keyboard_animation_control(
     animations: Res<ProtagonistAnimations>,
 ) {
 
-    let turn_speed = 3.0; // Fixed rotation speed (radians per second)
-    let move_speed = 5.0; // Base units per second
-    let run_speed = 30.0; // Base running speed
-    let strafe_speed = 4.0; // Base strafing speed
-    let underwater_speed = 30.0; // Underwater movement speed
-
     if let Ok((mut protagonist_transform, mut protagonist)) = protagonist_query.get_single_mut() {
+        // Manual up/down teleportation
+        if keyboard_input.just_pressed(KeyCode::KeyV) {
+            protagonist_transform.translation.y -= TELEPORT_DOWN_DISTANCE;
+            info!("Teleported {} units down!", TELEPORT_DOWN_DISTANCE);
+            return;  // Skip the rest of the input handling for this frame
+        }
+        if keyboard_input.just_pressed(KeyCode::KeyB) {
+            protagonist_transform.translation.y += TELEPORT_UP_DISTANCE;
+            info!("Teleported {} units up!", TELEPORT_UP_DISTANCE);
+            return;  // Skip the rest of the input handling for this frame
+        }
+
         // Calculate height multiplier
-        let height_multiplier = if protagonist_transform.translation.y > 100.0 { 2.0 } else { 1.0 };
-        let adjusted_move_speed = move_speed * height_multiplier;
-        let adjusted_run_speed = run_speed * height_multiplier;
-        let adjusted_strafe_speed = strafe_speed * height_multiplier;
+        let height_multiplier = if protagonist_transform.translation.y > HEIGHT_THRESHOLD { 
+            HEIGHT_MULTIPLIER_HIGH 
+        } else { 
+            HEIGHT_MULTIPLIER_NORMAL 
+        };
+        let adjusted_move_speed = MOVE_SPEED * height_multiplier;
+        let adjusted_run_speed = RUN_SPEED * height_multiplier;
+        let adjusted_strafe_speed = STRAFE_SPEED * height_multiplier;
 
         // Extract only Y rotation and force upright orientation
         let (yaw, _, _) = protagonist_transform.rotation.to_euler(EulerRot::YXZ);
@@ -53,47 +100,33 @@ pub fn keyboard_animation_control(
             if protagonist.is_swimming {
                 // Handle underwater movement
                 let mut movement = Vec3::ZERO;
-                let swimming_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                    underwater_speed * 20.0
+                let base_swimming_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
+                    UNDERWATER_SPEED * SWIM_SPEED_BOOST
                 } else {
-                    underwater_speed * 10.0  
+                    UNDERWATER_SPEED * SWIM_SPEED_NORMAL
                 };
                 
-                // Forward/Backward movement
+                // Forward/Backward movement with different speeds
                 if keyboard_input.pressed(KeyCode::KeyW) {
                     movement += protagonist_transform.forward().as_vec3();
                 }
                 if keyboard_input.pressed(KeyCode::KeyS) {
-                    movement -= protagonist_transform.forward().as_vec3();
+                    movement -= protagonist_transform.forward().as_vec3() * SWIM_SPEED_BACKWARD_MULTIPLIER;
                 }
                 
-                // Up/Down movement
+                // Up/Down movement with reduced speed
                 if keyboard_input.pressed(KeyCode::Space) {
-                    movement.y += 1.0;
+                    movement.y += SWIM_SPEED_VERTICAL_MULTIPLIER;
                 }
                 if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                    movement.y -= 1.0;
-                }
-
-                // Manual up/down teleportation
-                if keyboard_input.just_pressed(KeyCode::KeyV) {
-                    protagonist_transform.translation.y -= 10.0;
-                    info!("Teleported 10 units down!");
-                    // Don't interrupt the current animation
-                    continue;  // Skip the rest of the animation logic for this frame
-                }
-                if keyboard_input.just_pressed(KeyCode::KeyB) {
-                    protagonist_transform.translation.y += 15.0;
-                    info!("Teleported 15 units up!");
-                    // Don't interrupt the current animation
-                    continue;  // Skip the rest of the animation logic for this frame
+                    movement.y -= SWIM_SPEED_VERTICAL_MULTIPLIER;
                 }
 
                 // Handle rotation while swimming
                 let target_rotation = if keyboard_input.pressed(KeyCode::KeyA) {
-                    turn_speed
+                    TURN_SPEED
                 } else if keyboard_input.pressed(KeyCode::KeyD) {
-                    -turn_speed
+                    -TURN_SPEED
                 } else {
                     0.0
                 };
@@ -112,14 +145,14 @@ pub fn keyboard_animation_control(
                                 .play(
                                     &mut player,
                                     animations.animations[*swim],
-                                    Duration::from_millis(250),
+                                    Duration::from_millis(ANIMATION_TRANSITION_MS),
                                 )
                                 .set_speed(2.0)
                                 .set_repeat(RepeatAnimation::Forever);
                         }
                         
                         for mut linear_velocity in velocity_query.iter_mut() {
-                            linear_velocity.0 = movement.normalize() * swimming_speed;
+                            linear_velocity.0 = movement.normalize() * base_swimming_speed;
                         }
                     }
                 } else {
@@ -131,7 +164,7 @@ pub fn keyboard_animation_control(
                                 .play(
                                     &mut player,
                                     animations.animations[*tread],
-                                    Duration::from_millis(250),
+                                    Duration::from_millis(ANIMATION_TRANSITION_MS),
                                 )
                                 .set_repeat(RepeatAnimation::Forever);
                         }
@@ -158,7 +191,7 @@ pub fn keyboard_animation_control(
                             .play(
                                 &mut player,
                                 animations.animations[*fly],
-                                Duration::from_millis(250),
+                                Duration::from_millis(ANIMATION_TRANSITION_MS),
                             )
                             .set_repeat(RepeatAnimation::Never);
                     }
@@ -166,9 +199,9 @@ pub fn keyboard_animation_control(
                 
                 // Add rotation handling while falling
                 let target_rotation = if keyboard_input.pressed(KeyCode::KeyA) {
-                    turn_speed
+                    TURN_SPEED
                 } else if keyboard_input.pressed(KeyCode::KeyD) {
-                    -turn_speed
+                    -TURN_SPEED
                 } else {
                     0.0
                 };
@@ -217,7 +250,7 @@ pub fn keyboard_animation_control(
                                     .play(
                                         &mut player,
                                         animations.animations[*strafe],
-                                        Duration::from_millis(250),
+                                        Duration::from_millis(ANIMATION_TRANSITION_MS),
                                     )
                                     .set_repeat(RepeatAnimation::Forever);                                
                             }
@@ -246,7 +279,7 @@ pub fn keyboard_animation_control(
                                     .play(
                                         &mut player,
                                         animations.animations[*strafe],
-                                        Duration::from_millis(250),
+                                        Duration::from_millis(ANIMATION_TRANSITION_MS),
                                     )
                                     .set_repeat(RepeatAnimation::Forever);
                             }
@@ -272,7 +305,7 @@ pub fn keyboard_animation_control(
                                 .play(
                                     &mut player,
                                     animations.animations[*run],
-                                    Duration::from_millis(250),
+                                    Duration::from_millis(ANIMATION_TRANSITION_MS),
                                 )
                                 .set_repeat(RepeatAnimation::Forever);
                             
@@ -298,7 +331,7 @@ pub fn keyboard_animation_control(
                                 .play(
                                     &mut player,
                                     animations.animations[*walk_backward],
-                                    Duration::from_millis(250),
+                                    Duration::from_millis(ANIMATION_TRANSITION_MS),
                                 )
                                 .set_repeat(RepeatAnimation::Forever);
                             
@@ -323,7 +356,7 @@ pub fn keyboard_animation_control(
                                 .play(
                                     &mut player,
                                     animations.animations[*idle],
-                                    Duration::from_millis(250),
+                                    Duration::from_millis(ANIMATION_TRANSITION_MS),
                                 )
                                 .set_repeat(RepeatAnimation::Never);
                         }
@@ -332,9 +365,9 @@ pub fn keyboard_animation_control(
 
                 // Handle rotation
                 let target_rotation = if keyboard_input.pressed(KeyCode::KeyA) {
-                    turn_speed
+                    TURN_SPEED
                 } else if keyboard_input.pressed(KeyCode::KeyD) {
-                    -turn_speed
+                    -TURN_SPEED
                 } else {
                     0.0
                 };
@@ -362,25 +395,25 @@ pub fn keyboard_animation_control(
                         .play(
                             &mut player,
                             animations.animations[*jump],
-                            Duration::from_millis(250),
+                            Duration::from_millis(ANIMATION_TRANSITION_MS),
                         )
                         .set_repeat(RepeatAnimation::Never);
 
                     for mut impulse in impulse_query.iter_mut() {
-                        let mut jump_impulse = Vec3::new(0.0, 5.0, 0.0);
+                        let mut jump_impulse = Vec3::new(0.0, JUMP_BASE_IMPULSE, 0.0);
                         
                         // Add forward impulse if W is pressed
                         if keyboard_input.pressed(KeyCode::KeyW) {
                             let forward_strength = if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                                4.0 // Stronger forward leap when running
+                                JUMP_FORWARD_RUNNING
                             } else {
-                                2.0 // Normal forward leap
+                                JUMP_FORWARD_NORMAL
                             };
                             jump_impulse += protagonist_transform.forward() * forward_strength;
                             
                             // Increase vertical impulse for running leap
                             if keyboard_input.pressed(KeyCode::ShiftLeft) {
-                                jump_impulse.y = 12.5;
+                                jump_impulse.y = JUMP_VERTICAL_RUNNING;
                             }
                         }
                         
@@ -397,32 +430,20 @@ pub fn keyboard_animation_control(
                 // ... rest of charge placement code ...
             }
 
-            // Teleport the character 10 units down when V is pressed
-            if keyboard_input.just_pressed(KeyCode::KeyV) {
-                protagonist_transform.translation.y -= 10.0;
-                info!("Teleported 10 units down!");
-            }
-
-            // Teleport the character 15 units up when B is pressed
-            if keyboard_input.just_pressed(KeyCode::KeyB) {
-                protagonist_transform.translation.y += 15.0;
-                info!("Teleported 15 units up!");
-            }
-
             // Toggle lighting with K for night and L for alarm
             if keyboard_input.just_pressed(KeyCode::KeyK) {
                 for mut light in directional_light_query.iter_mut() {
                     // Switch to dark night mode
-                    light.illuminance = 10.0;
-                    light.color = Color::srgb(0.2, 0.2, 0.3); // Very dark blue night
+                    light.illuminance = NIGHT_ILLUMINANCE;
+                    light.color = NIGHT_COLOR;
                 }
             }
 
             if keyboard_input.just_pressed(KeyCode::KeyL) {
                 for mut light in directional_light_query.iter_mut() {
                     // Switch to red alarm lights
-                    light.illuminance = 1000.0;
-                    light.color = Color::srgb(1.0, 0.0, 0.0); // Bright red alarm light
+                    light.illuminance = ALARM_ILLUMINANCE;
+                    light.color = ALARM_COLOR;
                 }
             }
 

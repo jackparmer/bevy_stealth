@@ -10,7 +10,31 @@ use std::time::Duration;
 use crate::systems::core::minimap::{MinimapMarker, SentryMinimapMarker, MinimapResources, MINIMAP_MARKER_HEIGHT};
 use bevy::render::view::RenderLayers;
 
-const SENTRY_SPAWN_INTERVAL: f32 = 2.0; // Time in seconds between sentry spawns
+const SENTRY_SPAWN_INTERVAL: f32 = 1.0; // Reduced from 2.0 for more frequent spawns
+
+// Sentry movement constants
+const SENTRY_VIEW_DISTANCE: f32 = 800.0;
+const SENTRY_VIEW_ANGLE: f32 = std::f32::consts::PI / 1.5;
+const SENTRY_FOLLOW_SPEED: f32 = 15.0;
+const SENTRY_CLOSE_RANGE_MULTIPLIER: f32 = 2.0;
+const SENTRY_MID_RANGE_MULTIPLIER: f32 = 1.5;
+const SENTRY_CLOSE_RANGE_THRESHOLD: f32 = 20.0;
+const SENTRY_MID_RANGE_THRESHOLD: f32 = 50.0;
+const SENTRY_VERTICAL_SPEED_MULTIPLIER: f32 = 0.7;
+const SENTRY_SCALE: f32 = 1.5;
+
+// Explosion constants
+const EXPLOSION_MAX_ALLOWED: usize = 10;
+const EXPLOSION_BASE_PARTICLES_DRIVING: i32 = 1000;
+const EXPLOSION_BASE_PARTICLES_NORMAL: i32 = 500;
+const EXPLOSION_SCALE_DRIVING: f32 = 6.0;
+const EXPLOSION_SCALE_NORMAL: f32 = 3.0;
+const EXPLOSION_FADE_START: f32 = 3.0;
+const EXPLOSION_FADE_DURATION: f32 = 2.0;
+const EXPLOSION_SMOKE_HEIGHT_MAX: f32 = 2000.0;
+const EXPLOSION_PARTICLE_LIFETIME: f32 = 160.0;
+const EXPLOSION_SMOKE_SPACING: f32 = 1.6;
+const EXPLOSION_INITIAL_PARTICLES: i32 = 10;
 
 #[derive(Component)]
 pub struct ExplosionParticle {
@@ -50,7 +74,7 @@ impl Default for ExplosionCounter {
     fn default() -> Self {
         Self {
             count: 0,
-            max_allowed: 10, // Increased to allow more concurrent smoke columns
+            max_allowed: EXPLOSION_MAX_ALLOWED,
         }
     }
 }
@@ -78,7 +102,23 @@ pub struct LightConeAnimation {
 // Add a new component for individual sentry timing
 #[derive(Component)]
 pub struct SentryTiming {
-    time_offset: f32,
+    pub time_offset: f32,
+}
+
+// Add new resource to track sentry count
+#[derive(Resource)]
+pub struct SentryCounter {
+    count: usize,
+    max_allowed: usize,
+}
+
+impl Default for SentryCounter {
+    fn default() -> Self {
+        Self {
+            count: 0,
+            max_allowed: 10, // Maximum number of sentries allowed
+        }
+    }
 }
 
 // Add new system for animating the light cone
@@ -150,7 +190,12 @@ fn spawn_sentry_at(
     materials: &ExplosionMaterials,
     minimap_resources: &Res<MinimapResources>,
     spatial_query: &SpatialQuery,
+    sentry_counter: &mut ResMut<SentryCounter>,
 ) -> bool {
+    if sentry_counter.count >= sentry_counter.max_allowed {
+        return false;
+    }
+
     // Cast a ray down to find the ground position
     let ray_start = position + Vec3::new(0.0, 10.0, 0.0); // Start higher to ensure we find ground
     let ray_dir = Dir3::NEG_Y;
@@ -194,14 +239,14 @@ fn spawn_sentry_at(
                 .load(GltfAssetLabel::Scene(0)
                 .from_asset("models/tmpn3hy22ev.glb")),
             transform: Transform::from_translation(ground_position)
-                .with_scale(Vec3::splat(1.0)),
+                .with_scale(Vec3::splat(SENTRY_SCALE)),
             ..default()
         },
         materials.sentry_red_material.clone(),
         Sentry {
-            view_distance: 500.0,
-            view_angle: std::f32::consts::PI / 2.0,
-            follow_speed: 10.0,
+            view_distance: SENTRY_VIEW_DISTANCE,
+            view_angle: SENTRY_VIEW_ANGLE,
+            follow_speed: SENTRY_FOLLOW_SPEED,
             velocity: Vec3::ZERO,
         },
         Name::new("Sentry"),
@@ -244,6 +289,7 @@ fn spawn_sentry_at(
         RenderLayers::layer(1), // Add RenderLayers component
     ));
 
+    sentry_counter.count += 1;
     true
 }
 
@@ -255,13 +301,14 @@ pub fn spawn_sentry(
     explosion_materials: Res<ExplosionMaterials>,
     minimap_resources: Res<MinimapResources>,
     spatial_query: SpatialQuery,
+    mut sentry_counter: ResMut<SentryCounter>,
 ) {
     let sentry_position = Vec3::new(
         PROTAGONIST_START.position.x + 300.0,
         PROTAGONIST_START.position.y,
         PROTAGONIST_START.position.z - 200.0
     );
-    spawn_sentry_at(&mut commands, &asset_server, &mut meshes, sentry_position, &explosion_materials, &minimap_resources, &spatial_query);
+    spawn_sentry_at(&mut commands, &asset_server, &mut meshes, sentry_position, &explosion_materials, &minimap_resources, &spatial_query, &mut sentry_counter);
 }
 
 pub fn sentry_follow_system(
@@ -340,6 +387,15 @@ pub fn sentry_follow_system(
         let direction = protagonist_pos - transform.translation;
         let distance = direction.length();
 
+        // More aggressive movement when closer
+        let speed_multiplier = if distance < SENTRY_CLOSE_RANGE_THRESHOLD {
+            SENTRY_CLOSE_RANGE_MULTIPLIER
+        } else if distance < SENTRY_MID_RANGE_THRESHOLD {
+            SENTRY_MID_RANGE_MULTIPLIER
+        } else {
+            1.0
+        };
+
         if distance < sentry.view_distance {
             // Split movement into horizontal and vertical components
             let horizontal_direction = Vec3::new(direction.x, 0.0, direction.z).normalize();
@@ -372,13 +428,12 @@ pub fn sentry_follow_system(
             }
 
             // Calculate movement based on conditions
-            let mut movement = horizontal_direction * sentry.follow_speed * time.delta_seconds();
+            let mut movement = horizontal_direction * sentry.follow_speed * speed_multiplier * time.delta_seconds();
             
-            // Only add vertical movement if in contact with a vertical surface
+            // Reduce vertical movement speed as well
             if can_climb && vertical_movement.abs() > 0.1 {
-                movement.y = vertical_movement.signum() * sentry.follow_speed * time.delta_seconds();
+                movement.y = vertical_movement.signum() * (sentry.follow_speed * SENTRY_VERTICAL_SPEED_MULTIPLIER) * time.delta_seconds();
             } else {
-                // Apply gravity when not climbing
                 movement.y = -9.81 * time.delta_seconds();
             }
 
@@ -400,13 +455,13 @@ pub fn sentry_follow_system(
 
             // Update rotation with wobble effect
             if direction.length_squared() > 0.001 {
-                let wobble = Quat::from_rotation_z((individual_time * 8.0).sin() * 0.15);
+                let wobble = Quat::from_rotation_z((individual_time * 12.0).sin() * 0.25); // Faster, more pronounced wobble
                 transform.look_at(protagonist_pos, Vec3::Y);
                 transform.rotation *= wobble;
             }
             
-            // Trigger explosion at closer range
-            if distance < 2.0 {
+            // Trigger explosion at slightly longer range
+            if distance < 3.0 { // Increased from 2.0
                 commands.entity(entity).despawn_recursive();
                 
                 commands.spawn(SceneBundle {
@@ -481,6 +536,7 @@ pub fn setup_explosion_materials(
     };
     commands.insert_resource(materials);
     commands.insert_resource(ExplosionCounter::default());
+    commands.insert_resource(SentryCounter::default());
 }
 
 // Update spawn_explosion_effects to be more efficient
@@ -499,14 +555,14 @@ fn spawn_explosion_effects(
     }
     explosion_counter.count += 1;
 
-    let base_particles = if is_driving { 1000 } else { 500 }; // Halved particle count
+    let base_particles = if is_driving { EXPLOSION_BASE_PARTICLES_DRIVING } else { EXPLOSION_BASE_PARTICLES_NORMAL };
     let distance_scale = (1.0 - (camera_distance / 200.0).clamp(0.0, 0.9)) as f32;
     let particle_count = (base_particles as f32 * distance_scale) as i32;
 
-    let scale = if is_driving { 6.0 } else { 3.0 }; // Increased scale to compensate for fewer particles
+    let scale = if is_driving { EXPLOSION_SCALE_DRIVING } else { EXPLOSION_SCALE_NORMAL };
 
-    // Initial explosion particles - reduced count but longer lasting
-    for _ in 0..10 { // Reduced from 50 to 10
+    // Initial explosion particles
+    for _ in 0..EXPLOSION_INITIAL_PARTICLES {
         let random_dir = Vec3::new(
             rand::random::<f32>() * 2.0 - 1.0,
             rand::random::<f32>() * 2.0 + 1.0,
@@ -522,8 +578,8 @@ fn spawn_explosion_effects(
                 ..default()
             },
             ExplosionParticle {
-                velocity: random_dir * 15.0, // Slower initial velocity
-                lifetime: Timer::from_seconds(2.0, TimerMode::Once), // Shorter but more reasonable
+                velocity: random_dir * 15.0,
+                lifetime: Timer::from_seconds(2.0, TimerMode::Once),
                 is_smoke: false,
                 initial_scale: 2.0,
                 origin: position,
@@ -532,13 +588,13 @@ fn spawn_explosion_effects(
         ));
     }
 
-    // Smoke column particles - reduced count but maintain visual density
-    for i in 0..(particle_count / 4) { // Reduced to 1/4
-        let initial_lifetime = rand::random::<f32>() * 160.0;
-        let mut timer = Timer::from_seconds(160.0, TimerMode::Once);
+    // Smoke column particles
+    for i in 0..(particle_count / 4) {
+        let initial_lifetime = rand::random::<f32>() * EXPLOSION_PARTICLE_LIFETIME;
+        let mut timer = Timer::from_seconds(EXPLOSION_PARTICLE_LIFETIME, TimerMode::Once);
         timer.tick(Duration::from_secs_f32(initial_lifetime));
 
-        let height_offset = i as f32 * 1.6; // Doubled spacing to compensate for fewer particles
+        let height_offset = i as f32 * EXPLOSION_SMOKE_SPACING;
         let random_offset = Vec3::new(
             rand::random::<f32>() * 2.0 - 1.0,
             height_offset,
@@ -580,6 +636,7 @@ pub fn periodic_sentry_spawn(
     explosion_materials: Res<ExplosionMaterials>,
     minimap_resources: Res<MinimapResources>,
     spatial_query: SpatialQuery,
+    mut sentry_counter: ResMut<SentryCounter>,
 ) {
     // Initialize timer if it doesn't exist
     if timer_query.is_empty() {
@@ -597,26 +654,26 @@ pub fn periodic_sentry_spawn(
                 return;
             }
 
-            // Get protagonist's forward direction
-            let forward = protagonist_transform.forward();
+            // Try to spawn multiple sentries at once
+            let spawn_count = if rand::random::<f32>() < 0.3 { 2 } else { 1 };
             
-            // Try up to 5 times to find a valid spawn position
-            for _ in 0..5 {
-                // Generate random angle within 120-degree arc in front of protagonist
-                let angle = rand::random::<f32>() * PI / 1.5 - PI / 3.0; // -60° to +60°
-                let distance = 80.0 + rand::random::<f32>() * 120.0; // 80-200 units away
-                
-                // Calculate spawn position in front arc, but keep Y at ground level
-                let rotation = Quat::from_rotation_y(angle);
-                let spawn_direction = rotation * forward;
-                let spawn_pos = Vec3::new(
-                    protagonist_transform.translation.x + spawn_direction.x * distance,
-                    3.0, // Fixed ground level height
-                    protagonist_transform.translation.z + spawn_direction.z * distance,
-                );
-                
-                if spawn_sentry_at(&mut commands, &asset_server, &mut meshes, spawn_pos, &explosion_materials, &minimap_resources, &spatial_query) {
-                    break; // Successfully spawned
+            for _ in 0..spawn_count {
+                for _ in 0..5 {
+                    let angle = rand::random::<f32>() * PI / 1.5 - PI / 3.0;
+                    let distance = 60.0 + rand::random::<f32>() * 100.0; // Closer spawn range (was 80-200)
+                    
+                    // Calculate spawn position in front arc, but keep Y at ground level
+                    let rotation = Quat::from_rotation_y(angle);
+                    let spawn_direction = rotation * protagonist_transform.forward();
+                    let spawn_pos = Vec3::new(
+                        protagonist_transform.translation.x + spawn_direction.x * distance,
+                        3.0, // Fixed ground level height
+                        protagonist_transform.translation.z + spawn_direction.z * distance,
+                    );
+                    
+                    if spawn_sentry_at(&mut commands, &asset_server, &mut meshes, spawn_pos, &explosion_materials, &minimap_resources, &spatial_query, &mut sentry_counter) {
+                        break; // Successfully spawned
+                    }
                 }
             }
         }
@@ -632,14 +689,12 @@ pub fn update_explosion_particles(
 ) {
     for (entity, mut transform, mut particle, material_handle) in query.iter_mut() {
         let effect_age = time.elapsed_seconds() - particle.start_time;
-        let fade_start = 3.0; // Reduced from 15.0 for faster color transition
-        let fade_duration = 2.0; // Reduced from 10.0 for quicker fadeout
-        let fade_factor = ((fade_start - effect_age) / fade_duration).clamp(0.0, 1.0);
+        let fade_factor = ((EXPLOSION_FADE_START - effect_age) / EXPLOSION_FADE_DURATION).clamp(0.0, 1.0);
 
         particle.lifetime.tick(time.delta());
         
         if particle.lifetime.finished() {
-            if particle.is_smoke && effect_age < fade_start + fade_duration {
+            if particle.is_smoke && effect_age < EXPLOSION_FADE_START + EXPLOSION_FADE_DURATION {
                 transform.translation = particle.origin + Vec3::new(
                     rand::random::<f32>() * 0.2 - 0.1,
                     0.0,
@@ -655,7 +710,7 @@ pub fn update_explosion_particles(
                 
                 if let Some(material) = materials.get_mut(material_handle) {
                     let height = transform.translation.y - particle.origin.y;
-                    let height_fraction = (height / 2000.0).clamp(0.0, 1.0);
+                    let height_fraction = (height / EXPLOSION_SMOKE_HEIGHT_MAX).clamp(0.0, 1.0);
                     
                     let fire_color = Color::srgba(0.95, 0.3, 0.1, 0.98);
                     let smoke_color = Color::srgba(0.2, 0.2, 0.2, 0.7);
@@ -692,7 +747,7 @@ pub fn update_explosion_particles(
             }
         } else if particle.is_smoke {
             let height = transform.translation.y - particle.origin.y;
-            let height_fraction = (height / 2000.0).clamp(0.0, 1.0); // 100x taller (was 20.0)
+            let height_fraction = (height / EXPLOSION_SMOKE_HEIGHT_MAX).clamp(0.0, 1.0);
             
             let chaos_factor = height_fraction * height_fraction * fade_factor;
             let wobble = Vec3::new(
@@ -742,4 +797,12 @@ pub fn update_explosion_light(
             light.intensity = explosion_light.intensity * (1.0 - fraction);
         }
     }
+}
+
+// Add system to update counter when sentries are destroyed
+pub fn update_sentry_counter(
+    mut sentry_counter: ResMut<SentryCounter>,
+    sentry_query: Query<&Sentry>,
+) {
+    sentry_counter.count = sentry_query.iter().count();
 }

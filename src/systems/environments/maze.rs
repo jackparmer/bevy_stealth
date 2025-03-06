@@ -2,12 +2,14 @@ use bevy::prelude::*;
 use avian3d::prelude::*;
 use rand::prelude::*;
 use crate::systems::environments::ladder::{spawn_ladder, LadderConfig};
+use crate::components::Protagonist;
+use crate::systems::player::dirigible::DirigibleBalloon;
 
 // Maze configuration
 pub const MAZE_POSITION: Vec3 = Vec3::new(
-    2700.0,  // 2500 + 200
-    2.625,   // Same height
-    2200.0   // 2000 + 200
+    5232.0,
+    0.0,
+    3288.0
 );
 pub const CELL_SIZE: f32 = 40.0;
 const WALL_HEIGHT: f32 = 100.0;
@@ -21,7 +23,7 @@ pub const CATWALK_THICKNESS: f32 = 2.0;
 
 // Add neon configuration
 const NEON_WIDTH: f32 = 0.5;
-const NEON_HEIGHT: f32 = 0.3;
+const NEON_HEIGHT: f32 = 3.0;
 const NEON_OFFSET: f32 = CATWALK_WIDTH/2.0 + NEON_WIDTH/2.0;
 
 // Add ladder configuration
@@ -37,6 +39,14 @@ const ARROW_HEAD_WIDTH: f32 = 2.0;    // Increased from 1.0
 // Add height variation constants
 const MAX_WALL_HEIGHT: f32 = 200.0; // Increased from 200.0
 const MIN_WALL_HEIGHT: f32 = 80.0;  // Increased from 30.0
+
+// Add new component to track sphere position
+#[derive(Component)]
+pub struct DirigibleTriggerZone {
+    pub position: Vec3,
+    pub radius: f32,
+    pub entity: Entity,
+}
 
 #[derive(Clone, Copy, PartialEq)]
 enum Cell {
@@ -180,9 +190,17 @@ pub fn spawn_maze(
     });
 
     // Add neon material
-    let neon_material = materials.add(StandardMaterial {
+    let neon_material_blue = materials.add(StandardMaterial {
         base_color: Color::srgb(0.0, 0.0, 1.0), // Blue color
         emissive: Color::srgb(0.0, 0.0, 1.0).into(),   // Strong blue glow
+        perceptual_roughness: 0.0,
+        metallic: 1.0,
+        ..default()
+    });
+
+    let neon_material_purple = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.8, 0.0, 1.0), // Purple color
+        emissive: Color::srgb(0.8, 0.0, 1.0).into(),   // Strong purple glow
         perceptual_roughness: 0.0,
         metallic: 1.0,
         ..default()
@@ -222,12 +240,20 @@ pub fn spawn_maze(
     let sphere_y = catwalk_y + SPHERE_RADIUS * 1.2;
     let sphere_pos = Vec3::new(sphere_x, sphere_y, sphere_z);
 
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Sphere::new(SPHERE_RADIUS)),
-        material: sphere_material,
-        transform: Transform::from_translation(sphere_pos),
-        ..default()
-    });
+    let sphere_entity = commands.spawn_empty().id();
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Sphere::new(SPHERE_RADIUS)),
+            material: sphere_material,
+            transform: Transform::from_translation(sphere_pos),
+            ..default()
+        },
+        DirigibleTriggerZone {
+            position: sphere_pos,
+            radius: SPHERE_RADIUS,
+            entity: sphere_entity,
+        }
+    ));
 
     // Update sphere target position for arrows
     let sphere_target = Vec3::new(
@@ -296,21 +322,29 @@ pub fn spawn_maze(
         ));
 
         // Update neon strips height
-        for offset in [-NEON_OFFSET, NEON_OFFSET] {
-            commands.spawn(PbrBundle {
-                mesh: meshes.add(Cuboid::new(
+        for offset in [-NEON_OFFSET + NEON_WIDTH, NEON_OFFSET - NEON_WIDTH] {
+            commands.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Cuboid::new(
+                        total_length + CATWALK_WIDTH,
+                        NEON_HEIGHT,
+                        NEON_WIDTH,
+                    )),
+                    material: neon_material_blue.clone(),
+                    transform: Transform::from_xyz(
+                        start_x + total_length/2.0,
+                        catwalk_y + CATWALK_THICKNESS/2.0 + NEON_HEIGHT/2.0,
+                        z + offset
+                    ),
+                    ..default()
+                },
+                RigidBody::Static,
+                Collider::cuboid(
                     total_length + CATWALK_WIDTH,
                     NEON_HEIGHT,
-                    NEON_WIDTH,
-                )),
-                material: neon_material.clone(),
-                transform: Transform::from_xyz(
-                    start_x + total_length/2.0,
-                    catwalk_y + CATWALK_THICKNESS/2.0,
-                    z + offset
+                    NEON_WIDTH
                 ),
-                ..default()
-            });
+            ));
         }
 
         // In the horizontal segments loop, update arrow spawning:
@@ -407,21 +441,29 @@ pub fn spawn_maze(
         ));
 
         // Single continuous neon strips
-        for offset in [-NEON_OFFSET, NEON_OFFSET] {
-            commands.spawn(PbrBundle {
-                mesh: meshes.add(Cuboid::new(
+        for offset in [-NEON_OFFSET + NEON_WIDTH, NEON_OFFSET - NEON_WIDTH] {
+            commands.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Cuboid::new(
+                        NEON_WIDTH,
+                        NEON_HEIGHT,
+                        total_length + CATWALK_WIDTH,
+                    )),
+                    material: neon_material_purple.clone(),
+                    transform: Transform::from_xyz(
+                        x + offset,
+                        catwalk_y + CATWALK_THICKNESS/2.0 + NEON_HEIGHT/2.0,
+                        start_z + total_length/2.0
+                    ),
+                    ..default()
+                },
+                RigidBody::Static,
+                Collider::cuboid(
                     NEON_WIDTH,
                     NEON_HEIGHT,
-                    total_length + CATWALK_WIDTH,
-                )),
-                material: neon_material.clone(),
-                transform: Transform::from_xyz(
-                    x + offset,
-                    catwalk_y + CATWALK_THICKNESS/2.0,
-                    start_z + total_length/2.0
+                    total_length + CATWALK_WIDTH
                 ),
-                ..default()
-            });
+            ));
         }
 
         // Similarly for vertical segments:
@@ -480,13 +522,13 @@ pub fn spawn_maze(
                 let has_path_west = col > 0 && maze[row][col-1] == Cell::Path;
 
                 // Calculate total ladder height
-                let ladder_height = WALL_HEIGHT + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
+                let ladder_height = WALL_HEIGHT + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
 
                 // Only spawn ladders if there's a path on one side and walls on the adjacent sides
                 // This reduces the number of ladders and places them in more strategic locations
                 if has_path_north && !has_path_east && !has_path_west {
                     let wall_height = get_wall_height(x, z);
-                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
+                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -502,7 +544,7 @@ pub fn spawn_maze(
                 }
                 if has_path_south && !has_path_east && !has_path_west {
                     let wall_height = get_wall_height(x, z);
-                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
+                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -518,7 +560,7 @@ pub fn spawn_maze(
                 }
                 if has_path_east && !has_path_north && !has_path_south {
                     let wall_height = get_wall_height(x, z);
-                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
+                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -534,7 +576,7 @@ pub fn spawn_maze(
                 }
                 if has_path_west && !has_path_north && !has_path_south {
                     let wall_height = get_wall_height(x, z);
-                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS;
+                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -631,4 +673,61 @@ fn count_adjacent_paths(maze: &Vec<Vec<Cell>>, x: usize, y: usize) -> usize {
             }
         })
         .count()
+}
+
+// Add new system to check player position relative to sphere
+pub fn check_dirigible_trigger(
+    trigger_query: Query<(Entity, &DirigibleTriggerZone)>,
+    mut player_query: Query<(Entity, &Transform, &mut Protagonist)>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
+) {
+    if let (Ok((trigger_entity, trigger)), Ok((player_entity, player_transform, mut protagonist))) = (
+        trigger_query.get_single(),
+        player_query.get_single_mut()
+    ) {
+        let player_pos = player_transform.translation;
+        
+        // Check if player is within horizontal radius of sphere
+        let horizontal_dist = Vec2::new(
+            player_pos.x - trigger.position.x,
+            player_pos.z - trigger.position.z
+        ).length();
+
+        // Check if player is below sphere
+        if horizontal_dist < trigger.radius * 1.5 && player_pos.y < trigger.position.y {
+            // Only trigger if not already in dirigible mode
+            if !protagonist.is_dirigible {
+                protagonist.is_dirigible = true;
+                protagonist.is_swimming = false;
+                protagonist.is_falling = false;
+                protagonist.is_climbing = false;
+
+                // Spawn the dirigible balloon
+                commands.entity(player_entity).with_children(|parent| {
+                    parent.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(Mesh::from(Sphere::new(20.0))),
+                            material: materials.add(StandardMaterial {
+                                base_color: Color::srgb(1.0, 1.0, 1.0),
+                                base_color_texture: Some(asset_server.load("textures/american-flag-background.png")),
+                                metallic: 0.8,
+                                perceptual_roughness: 0.1,
+                                reflectance: 0.7,
+                                ..default()
+                            }),
+                            transform: Transform::from_xyz(0.0, 30.0, 0.0),
+                            ..default()
+                        },
+                        DirigibleBalloon,
+                    ));
+                });
+
+                // Despawn both the trigger entity and the sphere
+                commands.entity(trigger_entity).despawn_recursive();
+            }
+        }
+    }
 }

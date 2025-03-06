@@ -2,92 +2,145 @@ use bevy::prelude::*;
 use avian3d::prelude::*;
 
 use crate::components::Protagonist;
+use crate::systems::environments::terrain::Terrain;
+
+pub fn set_driving_state(
+    protagonist: &mut Protagonist,
+    scene: &mut Handle<Scene>,
+    asset_server: &AssetServer,
+    new_state: bool
+) {
+    protagonist.is_driving = new_state;
+    *scene = if new_state {
+        asset_server.load("models/KB03-apc.glb#Scene0")
+    } else {
+        asset_server.load("models/Protagonist.glb#Scene0")
+    };
+}
 
 pub fn toggle_driving(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(Entity, &mut Protagonist, &mut Handle<Scene>, &mut Transform)>,
-    mut camera_query: Query<&mut Transform, (With<Camera>, Without<Protagonist>)>,
+    mut query: Query<(Entity, &mut Protagonist, &mut Handle<Scene>)>,
     asset_server: Res<AssetServer>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyT) {
-        for (_, mut protagonist, mut scene, mut transform) in query.iter_mut() {
-            // Toggle driving state
-            protagonist.is_driving = !protagonist.is_driving;
-            
-            // Update the model and camera based on driving state
-            *scene = if protagonist.is_driving {
-                transform.scale = Vec3::splat(3.0);
-                // Adjust camera position for tank view
-                if let Ok(mut camera_transform) = camera_query.get_single_mut() {
-                    camera_transform.translation = Vec3::new(0.0, 15.0, 25.0); // Higher and further back
-                }
-                asset_server.load("models/KB03-apc.glb#Scene0")
-            } else {
-                transform.scale = Vec3::ONE;
-                // Reset camera position for protagonist view
-                if let Ok(mut camera_transform) = camera_query.get_single_mut() {
-                    camera_transform.translation = Vec3::new(0.0, 5.0, 8.0); // Normal following distance
-                }
-                asset_server.load("models/Protagonist.glb#Scene0")
-            };
+        for (_, mut protagonist, mut scene) in query.iter_mut() {
+            let new_state = !protagonist.is_driving;  // Store the value first
+            set_driving_state(&mut protagonist, &mut scene, &asset_server, new_state);
         }
     }
 }
 
 pub fn driving_control(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut protagonist_query: Query<(&mut Transform, &Protagonist)>,
+    mut protagonist_query: Query<(Entity, &mut Transform, &Protagonist)>,
     mut velocity_query: Query<&mut LinearVelocity, With<Protagonist>>,
     mut angular_velocity_query: Query<&mut AngularVelocity, With<Protagonist>>,
+    terrain_query: Query<Entity, With<Terrain>>,
+    spatial_query: SpatialQuery,
+    mut collision_events: EventReader<CollisionStarted>,
     time: Res<Time>,
 ) {
-    // Driving parameters
-    const TURN_SPEED: f32 = 3.0;
-    const MAX_DRIVING_SPEED: f32 = 300.0;
-    const MIN_DRIVING_SPEED: f32 = -150.0;
-    const ACCELERATION: f32 = 50.0;
-    const BRAKE_FORCE: f32 = 300.0;
-    const DRIFT_FACTOR: f32 = 0.85;
-    const TURN_SENSITIVITY: f32 = 2.0;
-    const SPEED_TURN_FACTOR: f32 = 0.3;
+    // Base driving parameters
+    const TURN_SPEED: f32 = 4.0;
+    const BASE_MAX_SPEED: f32 = 800.0;
+    const BASE_MIN_SPEED: f32 = -400.0;
+    const BASE_ACCELERATION: f32 = 200.0;
+    const BRAKE_FORCE: f32 = 600.0;
+    const DRIFT_FACTOR: f32 = 0.92;
+    const TURN_SENSITIVITY: f32 = 2.5;
+    const SPEED_TURN_FACTOR: f32 = 0.4;
+    const GROUND_ADHESION: f32 = -980.0;
+    const TERRAIN_SPEED_MULTIPLIER: f32 = 1000.0;
 
-    if let Ok((mut protagonist_transform, protagonist)) = protagonist_query.get_single_mut() {
+    if let Ok((protagonist_entity, mut protagonist_transform, protagonist)) = protagonist_query.get_single_mut() {
         if !protagonist.is_driving {
             return;
+        }
+
+        // Multiple ground check points using raycasts
+        let ray_positions = [
+            protagonist_transform.translation + Vec3::new(2.0, 0.5, 2.0),   // Front right
+            protagonist_transform.translation + Vec3::new(-2.0, 0.5, 2.0),  // Front left
+            protagonist_transform.translation + Vec3::new(2.0, 0.5, -2.0),  // Back right
+            protagonist_transform.translation + Vec3::new(-2.0, 0.5, -2.0), // Back left
+            protagonist_transform.translation + Vec3::new(0.0, 0.5, 0.0),   // Center
+        ];
+
+        let ray_dir = Dir3::NEG_Y;
+        let max_distance = 5.0;
+        let filter = SpatialQueryFilter::from_excluded_entities([protagonist_entity]);
+        
+        let mut is_grounded = false;
+        let mut ground_height = protagonist_transform.translation.y;
+
+        // Check all ray positions and find the highest ground point
+        for ray_pos in ray_positions.iter() {
+            let hits = spatial_query.ray_hits(
+                *ray_pos, 
+                ray_dir, 
+                max_distance,
+                1,
+                true,
+                filter.clone()
+            );
+
+            if let Some(hit) = hits.first() {
+                is_grounded = true;
+                let hit_height = ray_pos.y - hit.time_of_impact;
+                ground_height = ground_height.max(hit_height);
+            }
+        }
+
+        // Check terrain collision using events
+        let mut on_terrain = false;
+        if let Ok(terrain_entity) = terrain_query.get_single() {
+            for CollisionStarted(e1, e2) in collision_events.read() {
+                if (*e1 == terrain_entity || *e2 == terrain_entity) && 
+                   (*e1 == protagonist_entity || *e2 == protagonist_entity) {
+                    on_terrain = true;
+                    break;
+                }
+            }
+        }
+
+        let mut current_velocity = velocity_query.single_mut();
+        
+        // Enhanced ground adhesion logic
+        if is_grounded {
+            // Smoothly adjust height to match ground
+            protagonist_transform.translation.y = ground_height;
+            current_velocity.0.y = 0.0;
+        } else {
+            // Apply gravity when not grounded
+            current_velocity.0.y += GROUND_ADHESION * time.delta_seconds();
         }
 
         // Extract only Y rotation and force upright orientation
         let (yaw, _, _) = protagonist_transform.rotation.to_euler(EulerRot::YXZ);
         protagonist_transform.rotation = Quat::from_rotation_y(yaw);
 
-        let mut current_velocity = velocity_query.single_mut();
-        let dt = time.delta_seconds();
-        
         // Decompose velocity into forward and lateral components
         let forward_dir = protagonist_transform.left().as_vec3();
         let right_dir = protagonist_transform.forward().as_vec3();
         let current_speed = current_velocity.0.dot(forward_dir);
         let lateral_speed = current_velocity.0.dot(right_dir);
 
-        // Calculate acceleration based on input
         let mut acceleration_amount = 0.0;
         if keyboard_input.pressed(KeyCode::KeyW) {
-            acceleration_amount = ACCELERATION * dt;
+            acceleration_amount = BASE_ACCELERATION * time.delta_seconds();
         } else if keyboard_input.pressed(KeyCode::KeyS) {
-            // Apply brakes if moving forward, otherwise accelerate backward
             if current_speed > 0.0 {
-                acceleration_amount = -BRAKE_FORCE * dt;
+                acceleration_amount = -BRAKE_FORCE * time.delta_seconds();
             } else {
-                acceleration_amount = -ACCELERATION * 0.5 * dt;
+                acceleration_amount = -BASE_ACCELERATION * 0.5 * time.delta_seconds();
             }
         } else if current_speed.abs() > 1.0 {
-            // Natural deceleration when no input
-            acceleration_amount = -current_speed.signum() * BRAKE_FORCE * 0.5 * dt;
+            acceleration_amount = -current_speed.signum() * BRAKE_FORCE * 0.5 * time.delta_seconds();
         }
 
-        // Apply acceleration and clamp speed
         let new_speed = (current_speed + acceleration_amount)
-            .clamp(MIN_DRIVING_SPEED, MAX_DRIVING_SPEED);
+            .clamp(BASE_MIN_SPEED, BASE_MAX_SPEED);
 
         // Calculate turning based on speed
         let turn_amount = if keyboard_input.pressed(KeyCode::KeyA) {
@@ -99,7 +152,7 @@ pub fn driving_control(
         };
 
         // Adjust turn rate based on speed
-        let speed_ratio = (current_speed.abs() / MAX_DRIVING_SPEED).powf(SPEED_TURN_FACTOR);
+        let speed_ratio = (current_speed.abs() / BASE_MAX_SPEED).powf(SPEED_TURN_FACTOR);
         let adjusted_turn = turn_amount * TURN_SENSITIVITY * speed_ratio;
 
         // Apply drift mechanics

@@ -33,9 +33,9 @@ use systems::environments::terrain::{spawn_terrain, toggle_terrain_texture};
 use systems::environments::airlock::{spawn_airlock, handle_airlock_teleport, blink_airlock_light};
 use systems::environments::tram::move_tram;
 use systems::environments::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
-use systems::environments::maze::spawn_maze;
-use systems::environments::ice_cave::update_ice_particles;
-use systems::environments::garage::spawn_garage;
+use systems::environments::maze::{spawn_maze, check_dirigible_trigger};
+use systems::environments::ice_cave::{update_ice_particles, handle_ice_cave_interactions};
+use systems::environments::garage::{spawn_garage, handle_tank_interaction};
 
 use systems::core::sentry::{
     spawn_sentry,
@@ -117,6 +117,9 @@ fn main() {
         .add_systems(Startup, setup_screenplay)
         .add_systems(Update, screenplay_system)
         .add_systems(Update, update_ice_particles)
+        .add_systems(Update, handle_ice_cave_interactions)
+        .add_systems(Update, handle_tank_interaction)
+        .add_systems(Update, check_dirigible_trigger)
         .run();
 }
 

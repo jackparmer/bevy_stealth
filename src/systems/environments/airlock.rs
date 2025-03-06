@@ -4,7 +4,7 @@ use avian3d::prelude::*;
 use crate::components::Protagonist;
 
 pub const AIRLOCK_RADIUS: f32 = 16.0;
-pub const AIRLOCK_LENGTH: f32 = 100.0;
+pub const AIRLOCK_LENGTH: f32 = 800.0;
 pub const AIRLOCK_POSITION: Vec3 = Vec3::new(865.24176, 2.6249726, -424.97363);
 pub const AIRLOCK_TELEPORT_OFFSET: f32 = 20.0;
 

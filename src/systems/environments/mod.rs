@@ -9,3 +9,4 @@ pub mod launch_silo;
 pub mod reactor;
 pub mod maze;
 pub mod garage;
+pub mod glaciers;

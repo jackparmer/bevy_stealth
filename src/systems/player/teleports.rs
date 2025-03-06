@@ -79,7 +79,7 @@ pub fn teleport_system(
         Some((OUTSIDE, "Outside"))
     } else if keyboard.just_pressed(KeyCode::Digit0) {
         let mut pos = REACTOR;
-        pos.y += CYLINDER_HEIGHT/2.0 + WALL_THICKNESS;
+        pos.y += CYLINDER_HEIGHT/2.0 + WALL_THICKNESS + 10.0;
         Some((pos, "Reactor Top"))
     } else if keyboard.just_pressed(KeyCode::KeyM) {
         Some((MAZE_START, "Maze"))

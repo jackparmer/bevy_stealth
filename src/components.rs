@@ -44,3 +44,6 @@ pub struct Sentry {
     pub velocity: Vec3,
 }
 
+#[derive(Component)]
+pub struct Tank;
+

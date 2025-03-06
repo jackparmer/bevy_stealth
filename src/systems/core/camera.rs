@@ -4,7 +4,7 @@ use crate::components::{Protagonist, HighAltitudeIndicator};
 pub fn rotate_camera(
     time: Res<Time>,
     protagonist_query: Query<(Entity, &Transform, &Protagonist, Option<&Children>)>,
-    mut camera_query: Query<&mut Transform, (With<Camera3d>, Without<Protagonist>)>,
+    mut camera_query: Query<(&mut Transform, &mut Projection), (With<Camera3d>, Without<Protagonist>)>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -46,10 +46,28 @@ pub fn rotate_camera(
             }
         }
 
-        for mut camera_transform in camera_query.iter_mut() {
+        for (mut camera_transform, mut projection) in camera_query.iter_mut() {
+            // Update projection based on birds-eye view
+            if protagonist.is_birds_eye {
+                // Switch to orthographic projection when in birds-eye view
+                if let Projection::Perspective(_) = &*projection {
+                    *projection = Projection::Orthographic(OrthographicProjection {
+                        scale: 0.8,
+                        near: -1000.0,
+                        far: 1000.0,
+                        ..default()
+                    });
+                }
+            } else {
+                // Switch back to perspective projection when not in birds-eye view
+                if let Projection::Orthographic(orthographic) = &*projection {
+                    *projection = Projection::Perspective(PerspectiveProjection::default());
+                }
+            }
+
             // Adjust follow offset based on state
             let follow_offset = if protagonist.is_birds_eye {
-                Vec3::new(0.0, 250.0, 0.1) // Birds-eye view (high up, looking straight down)
+                Vec3::new(20.0, 150.0, 20.0) // Reduced height, added slight offset for depth perception
             } else if protagonist_position.y > 100.0 {
                 Vec3::new(0.0, 30.0, 100.0)
             } else if protagonist.is_driving && !protagonist.is_climbing {
