@@ -34,9 +34,9 @@ const TELEPORT_UP_DISTANCE: f32 = 15.0;
 
 // Jump impulse values
 const JUMP_BASE_IMPULSE: f32 = 5.0;
-const JUMP_FORWARD_NORMAL: f32 = 2.0;
-const JUMP_FORWARD_RUNNING: f32 = 4.0;
-const JUMP_VERTICAL_RUNNING: f32 = 12.5;
+const JUMP_FORWARD_NORMAL: f32 = 8.0;
+const JUMP_FORWARD_RUNNING: f32 = 12.0;
+const JUMP_VERTICAL_RUNNING: f32 = 8.0;
 
 // Animation transition duration
 const ANIMATION_TRANSITION_MS: u64 = 250;
@@ -401,26 +401,42 @@ pub fn keyboard_animation_control(
 
                     for mut impulse in impulse_query.iter_mut() {
                         let mut jump_impulse = Vec3::new(0.0, JUMP_BASE_IMPULSE, 0.0);
+                        info!("Base jump impulse: {:?}", jump_impulse);
                         
                         // Add forward impulse if W is pressed
                         if keyboard_input.pressed(KeyCode::KeyW) {
                             let forward_strength = if keyboard_input.pressed(KeyCode::ShiftLeft) {
+                                info!("Running jump detected");
                                 JUMP_FORWARD_RUNNING
                             } else {
+                                info!("Walking jump detected");
                                 JUMP_FORWARD_NORMAL
                             };
-                            jump_impulse += protagonist_transform.forward() * forward_strength;
+                            
+                            let forward_impulse = protagonist_transform.forward() * forward_strength;
+                            info!("Forward direction: {:?}", protagonist_transform.forward());
+                            info!("Forward impulse component: {:?}", forward_impulse);
+                            
+                            jump_impulse += forward_impulse;
                             
                             // Increase vertical impulse for running leap
                             if keyboard_input.pressed(KeyCode::ShiftLeft) {
                                 jump_impulse.y = JUMP_VERTICAL_RUNNING;
+                                info!("Increased vertical impulse for running: {}", JUMP_VERTICAL_RUNNING);
                             }
                         }
                         
+                        info!("Final jump impulse: {:?}", jump_impulse);
                         impulse.apply_impulse(jump_impulse);
+                        
+                        // Zero out linear velocity to prevent interference with jump
+                        for mut linear_velocity in velocity_query.iter_mut() {
+                            linear_velocity.0 = Vec3::ZERO;
+                        }
                     }
 
-                    break;
+                    // Important: Return here to skip normal movement handling during jump initiation
+                    return;
                 }
             }
 

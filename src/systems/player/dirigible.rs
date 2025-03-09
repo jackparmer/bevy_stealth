@@ -58,7 +58,7 @@ pub fn toggle_dirigible(
                 commands.entity(entity).with_children(|parent| {
                     parent.spawn((
                         PbrBundle {
-                            mesh: meshes.add(Mesh::from(Sphere::new(4.0))),
+                            mesh: meshes.add(Mesh::from(Sphere::new(2.0))),
                             material: materials.add(StandardMaterial {
                                 base_color: Color::srgb(1.0, 1.0, 1.0),
                                 base_color_texture: Some(asset_server.load("textures/american-flag-background.png")),
@@ -73,6 +73,7 @@ pub fn toggle_dirigible(
                         DirigibleBalloon,
                     ));
                 });
+                protagonist.is_birds_eye = false;
             }
         }
     }

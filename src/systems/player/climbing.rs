@@ -63,6 +63,7 @@ pub fn climbing_keyboard_control(
     mut velocity_query: Query<(&mut LinearVelocity, &mut AngularVelocity), With<Protagonist>>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     mut camera_query: Query<&mut Transform, (With<Camera>, Without<Protagonist>)>,
+    mut spotlight_query: Query<&mut Transform, (With<SpotLight>, Without<Camera>, Without<Protagonist>)>,
     animations: Res<ProtagonistAnimations>,
     time: Res<Time>,
 ) {
@@ -70,6 +71,19 @@ pub fn climbing_keyboard_control(
         Ok(p) => p,
         Err(_) => return,
     };
+
+    // Update spotlight position when climbing
+    if let Ok(mut spotlight_transform) = spotlight_query.get_single_mut() {
+        if protagonist.is_climbing {
+            // Position light behind and slightly above player when climbing
+            spotlight_transform.translation = protagonist_transform.translation + Vec3::new(0.0, 2.0, 4.0);
+            spotlight_transform.look_at(protagonist_transform.translation, Vec3::Y);
+        } else {
+            // Reset to original position when not climbing
+            spotlight_transform.translation = Vec3::new(0.0, 15.0, 2.0);
+            spotlight_transform.look_at(Vec3::new(0.0, 0.0, -10.0), Vec3::Y);
+        }
+    }
 
     // Add space key detection to stop climbing
     if protagonist.is_climbing && keyboard_input.just_pressed(KeyCode::Space) {

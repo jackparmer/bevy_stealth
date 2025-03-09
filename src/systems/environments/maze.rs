@@ -3,7 +3,9 @@ use avian3d::prelude::*;
 use rand::prelude::*;
 use crate::systems::environments::ladder::{spawn_ladder, LadderConfig};
 use crate::components::Protagonist;
-use crate::systems::player::dirigible::DirigibleBalloon;
+ use crate::systems::player::dirigible::DirigibleBalloon;
+use crate::systems::core::screenplay::{MessageDisplay, display_message};
+
 
 // Maze configuration
 pub const MAZE_POSITION: Vec3 = Vec3::new(
@@ -53,6 +55,17 @@ enum Cell {
     Wall,
     Path,
 }
+
+// Add new constants for neon caps and safety walls
+const NEON_CAP_THICKNESS: f32 = 0.2;
+const SAFETY_WALL_HEIGHT: f32 = NEON_HEIGHT + CATWALK_THICKNESS/2.0; // Height from catwalk to top of neon
+const SAFETY_WALL_THICKNESS: f32 = 1.0;
+const SAFETY_WALL_WIDTH: f32 = CATWALK_WIDTH * 1.5;
+
+// Add new constants for edge neon strips
+const EDGE_NEON_HEIGHT: f32 = 1.0;  // Smaller than main neon
+const EDGE_NEON_WIDTH: f32 = 0.2;   // Thinner than main neon
+const EDGE_NEON_OFFSET: f32 = CATWALK_WIDTH/2.0;  // Position at edge of catwalk
 
 // Helper function to find continuous horizontal segments
 fn find_horizontal_segments(maze: &Vec<Vec<Cell>>) -> Vec<(usize, usize, usize)> {
@@ -206,6 +219,21 @@ pub fn spawn_maze(
         ..default()
     });
 
+    let neon_cap_material = materials.add(StandardMaterial {
+        base_color: Color::BLACK,
+        perceptual_roughness: 0.9,
+        metallic: 0.1,
+        ..default()
+    });
+
+    let edge_neon_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.0, 1.0, 1.0), // Cyan color
+        emissive: Color::srgb(0.0, 1.0, 1.0).into(),   // Cyan glow
+        perceptual_roughness: 0.0,
+        metallic: 1.0,
+        ..default()
+    });
+
     let catwalk_y = MAZE_POSITION.y + WALL_HEIGHT + CATWALK_HEIGHT_OFFSET;
 
     // Find all segments first
@@ -276,6 +304,7 @@ pub fn spawn_maze(
         
         // Look ahead for segments we can bridge to
         let mut next_col = current_end + 1;
+        let mut bridged_segments = vec![(*start_col, *end_col)];  // Track individual segments
         while next_col < MAZE_SIZE {
             if let Some((_, bridge_start, bridge_end)) = h_segments.iter()
                 .find(|&&(r, s, _)| r == *row && s == next_col) {
@@ -283,6 +312,7 @@ pub fn spawn_maze(
                 total_length += (*bridge_end - *bridge_start + 2) as f32 * CELL_SIZE;
                 next_col = *bridge_end + 1;
                 processed_h_segments.insert((*row, *bridge_start));
+                bridged_segments.push((*bridge_start, *bridge_end));
             } else {
                 break;
             }
@@ -291,7 +321,7 @@ pub fn spawn_maze(
         let start_x = MAZE_POSITION.x + (*start_col as f32 * CELL_SIZE);
         let z = MAZE_POSITION.z + (*row as f32 * CELL_SIZE);
 
-        // Update catwalk spawning for horizontal segments
+        // Spawn the continuous catwalk as before
         let wall_height = get_wall_height(
             start_x + total_length/2.0,
             z
@@ -321,30 +351,102 @@ pub fn spawn_maze(
             ),
         ));
 
-        // Update neon strips height
-        for offset in [-NEON_OFFSET + NEON_WIDTH, NEON_OFFSET - NEON_WIDTH] {
-            commands.spawn((
-                PbrBundle {
-                    mesh: meshes.add(Cuboid::new(
-                        total_length + CATWALK_WIDTH,
+        // Spawn neon strips for each actual wall segment
+        for (segment_start, segment_end) in bridged_segments {
+            let segment_length = (segment_end - segment_start + 1) as f32 * CELL_SIZE;
+            let segment_x = MAZE_POSITION.x + (segment_start as f32 * CELL_SIZE);
+
+            for offset in [-NEON_OFFSET + NEON_WIDTH, NEON_OFFSET - NEON_WIDTH] {
+                commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Cuboid::new(
+                            segment_length,
+                            NEON_HEIGHT,
+                            NEON_WIDTH,
+                        )),
+                        material: neon_material_blue.clone(),
+                        transform: Transform::from_xyz(
+                            segment_x + segment_length/2.0,
+                            catwalk_y + CATWALK_THICKNESS/2.0 + NEON_HEIGHT/2.0,
+                            z + offset
+                        ),
+                        ..default()
+                    },
+                    RigidBody::Static,
+                    Collider::cuboid(
+                        segment_length,
                         NEON_HEIGHT,
+                        NEON_WIDTH
+                    ),
+                ));
+
+                // Add black cap on top of neon
+                commands.spawn(PbrBundle {
+                    mesh: meshes.add(Cuboid::new(
+                        segment_length,
+                        NEON_CAP_THICKNESS,
                         NEON_WIDTH,
                     )),
-                    material: neon_material_blue.clone(),
+                    material: neon_cap_material.clone(),
                     transform: Transform::from_xyz(
-                        start_x + total_length/2.0,
-                        catwalk_y + CATWALK_THICKNESS/2.0 + NEON_HEIGHT/2.0,
+                        segment_x + segment_length/2.0,
+                        catwalk_y + CATWALK_THICKNESS/2.0 + NEON_HEIGHT + NEON_CAP_THICKNESS/2.0,
                         z + offset
                     ),
                     ..default()
-                },
-                RigidBody::Static,
-                Collider::cuboid(
-                    total_length + CATWALK_WIDTH,
-                    NEON_HEIGHT,
-                    NEON_WIDTH
-                ),
-            ));
+                });
+            }
+
+            // Add edge neon strips
+            for offset in [-EDGE_NEON_OFFSET, EDGE_NEON_OFFSET] {
+                // Bottom edge (existing)
+                commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Cuboid::new(
+                            segment_length,
+                            EDGE_NEON_HEIGHT,
+                            EDGE_NEON_WIDTH,
+                        )),
+                        material: edge_neon_material.clone(),
+                        transform: Transform::from_xyz(
+                            segment_x + segment_length/2.0,
+                            catwalk_y - CATWALK_THICKNESS/2.0,  // Bottom edge
+                            z + offset
+                        ),
+                        ..default()
+                    },
+                    RigidBody::Static,
+                    Collider::cuboid(
+                        segment_length,
+                        EDGE_NEON_HEIGHT,
+                        EDGE_NEON_WIDTH
+                    ),
+                ));
+
+                // Top edge (new)
+                commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Cuboid::new(
+                            segment_length,
+                            EDGE_NEON_HEIGHT,
+                            EDGE_NEON_WIDTH,
+                        )),
+                        material: edge_neon_material.clone(),
+                        transform: Transform::from_xyz(
+                            segment_x + segment_length/2.0,
+                            catwalk_y + CATWALK_THICKNESS/2.0,  // Top edge
+                            z + offset
+                        ),
+                        ..default()
+                    },
+                    RigidBody::Static,
+                    Collider::cuboid(
+                        segment_length,
+                        EDGE_NEON_HEIGHT,
+                        EDGE_NEON_WIDTH
+                    ),
+                ));
+            }
         }
 
         // In the horizontal segments loop, update arrow spawning:
@@ -388,7 +490,7 @@ pub fn spawn_maze(
     let mut processed_v_segments = std::collections::HashSet::new();
 
     for (col, start_row, end_row) in &v_segments {
-        // Skip if we've already processed this segment as part of a bridge
+        // Skip if we've already processed this segment
         if processed_v_segments.contains(&(*col, *start_row)) {
             continue;
         }
@@ -396,15 +498,18 @@ pub fn spawn_maze(
         let current_end = *end_row;
         let mut total_length = (*end_row - *start_row + 1) as f32 * CELL_SIZE;
         
+        // Track individual segments for vertical neon strips
+        let mut bridged_segments = vec![(*start_row, *end_row)];
+        
         // Look ahead for segments we can bridge to
         let mut next_row = current_end + 1;
         while next_row < MAZE_SIZE {
             if let Some((bridge_col, bridge_start, bridge_end)) = v_segments.iter()
                 .find(|&&(c, s, _)| c == *col && s == next_row) {
-                // Found a segment to bridge to
                 total_length += (*bridge_end - *bridge_start + 2) as f32 * CELL_SIZE;
                 next_row = *bridge_end + 1;
                 processed_v_segments.insert((*bridge_col, *bridge_start));
+                bridged_segments.push((*bridge_start, *bridge_end));
             } else {
                 break;
             }
@@ -413,7 +518,7 @@ pub fn spawn_maze(
         let x = MAZE_POSITION.x + (*col as f32 * CELL_SIZE);
         let start_z = MAZE_POSITION.z + (*start_row as f32 * CELL_SIZE);
 
-        // Spawn single continuous catwalk with one collider
+        // Spawn continuous catwalk as before
         let wall_height = get_wall_height(x, start_z + total_length/2.0);
         let catwalk_y = wall_height + MAZE_POSITION.y + CATWALK_HEIGHT_OFFSET;
 
@@ -440,30 +545,102 @@ pub fn spawn_maze(
             ),
         ));
 
-        // Single continuous neon strips
-        for offset in [-NEON_OFFSET + NEON_WIDTH, NEON_OFFSET - NEON_WIDTH] {
-            commands.spawn((
-                PbrBundle {
-                    mesh: meshes.add(Cuboid::new(
+        // Spawn neon strips for each actual wall segment
+        for (segment_start, segment_end) in bridged_segments {
+            let segment_length = (segment_end - segment_start + 1) as f32 * CELL_SIZE;
+            let segment_z = MAZE_POSITION.z + (segment_start as f32 * CELL_SIZE);
+
+            for offset in [-NEON_OFFSET + NEON_WIDTH, NEON_OFFSET - NEON_WIDTH] {
+                commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Cuboid::new(
+                            NEON_WIDTH,
+                            NEON_HEIGHT,
+                            segment_length,
+                        )),
+                        material: neon_material_purple.clone(),
+                        transform: Transform::from_xyz(
+                            x + offset,
+                            catwalk_y + CATWALK_THICKNESS/2.0 + NEON_HEIGHT/2.0,
+                            segment_z + segment_length/2.0
+                        ),
+                        ..default()
+                    },
+                    RigidBody::Static,
+                    Collider::cuboid(
                         NEON_WIDTH,
                         NEON_HEIGHT,
-                        total_length + CATWALK_WIDTH,
+                        segment_length
+                    ),
+                ));
+
+                // Add black cap on top of neon
+                commands.spawn(PbrBundle {
+                    mesh: meshes.add(Cuboid::new(
+                        NEON_WIDTH,
+                        NEON_CAP_THICKNESS,
+                        segment_length,
                     )),
-                    material: neon_material_purple.clone(),
+                    material: neon_cap_material.clone(),
                     transform: Transform::from_xyz(
                         x + offset,
-                        catwalk_y + CATWALK_THICKNESS/2.0 + NEON_HEIGHT/2.0,
-                        start_z + total_length/2.0
+                        catwalk_y + CATWALK_THICKNESS/2.0 + NEON_HEIGHT + NEON_CAP_THICKNESS/2.0,
+                        segment_z + segment_length/2.0
                     ),
                     ..default()
-                },
-                RigidBody::Static,
-                Collider::cuboid(
-                    NEON_WIDTH,
-                    NEON_HEIGHT,
-                    total_length + CATWALK_WIDTH
-                ),
-            ));
+                });
+            }
+
+            // Add edge neon strips
+            for offset in [-EDGE_NEON_OFFSET, EDGE_NEON_OFFSET] {
+                // Bottom edge (existing)
+                commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Cuboid::new(
+                            EDGE_NEON_WIDTH,
+                            EDGE_NEON_HEIGHT,
+                            segment_length,
+                        )),
+                        material: edge_neon_material.clone(),
+                        transform: Transform::from_xyz(
+                            x + offset,
+                            catwalk_y - CATWALK_THICKNESS/2.0,  // Bottom edge
+                            segment_z + segment_length/2.0
+                        ),
+                        ..default()
+                    },
+                    RigidBody::Static,
+                    Collider::cuboid(
+                        EDGE_NEON_WIDTH,
+                        EDGE_NEON_HEIGHT,
+                        segment_length
+                    ),
+                ));
+
+                // Top edge (new)
+                commands.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(Cuboid::new(
+                            EDGE_NEON_WIDTH,
+                            EDGE_NEON_HEIGHT,
+                            segment_length,
+                        )),
+                        material: edge_neon_material.clone(),
+                        transform: Transform::from_xyz(
+                            x + offset,
+                            catwalk_y + CATWALK_THICKNESS/2.0,  // Top edge
+                            segment_z + segment_length/2.0
+                        ),
+                        ..default()
+                    },
+                    RigidBody::Static,
+                    Collider::cuboid(
+                        EDGE_NEON_WIDTH,
+                        EDGE_NEON_HEIGHT,
+                        segment_length
+                    ),
+                ));
+            }
         }
 
         // Similarly for vertical segments:
@@ -521,14 +698,11 @@ pub fn spawn_maze(
                 let has_path_east = col < MAZE_SIZE-1 && maze[row][col+1] == Cell::Path;
                 let has_path_west = col > 0 && maze[row][col-1] == Cell::Path;
 
-                // Calculate total ladder height
-                let ladder_height = WALL_HEIGHT + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
+                // Only spawn a single ladder in the first valid direction we find
+                let wall_height = get_wall_height(x, z);
+                let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT * 2.0; // Added NEON_HEIGHT to account for both top and bottom neon rails
 
-                // Only spawn ladders if there's a path on one side and walls on the adjacent sides
-                // This reduces the number of ladders and places them in more strategic locations
                 if has_path_north && !has_path_east && !has_path_west {
-                    let wall_height = get_wall_height(x, z);
-                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -541,26 +715,27 @@ pub fn spawn_maze(
                             rung_count: 150,
                         },
                     );
-                }
-                if has_path_south && !has_path_east && !has_path_west {
-                    let wall_height = get_wall_height(x, z);
-                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
-                    spawn_ladder(
-                        &mut commands,
-                        &mut meshes,
-                        &mut materials,
-                        &asset_server,
-                        LadderConfig {
-                            position: Vec3::new(x, MAZE_POSITION.y, z + WALL_THICKNESS/2.0 + LADDER_WALL_OFFSET),
-                            rotation: Quat::from_rotation_y(std::f32::consts::PI * 1.5),
-                            height: ladder_height,
-                            rung_count: 150,
+
+                    // Add safety wall on the opposite side
+                    commands.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(Cuboid::new(
+                                SAFETY_WALL_WIDTH,
+                                SAFETY_WALL_HEIGHT,
+                                SAFETY_WALL_THICKNESS
+                            )),
+                            material: catwalk_material.clone(),
+                            transform: Transform::from_xyz(
+                                x,
+                                catwalk_y + SAFETY_WALL_HEIGHT/2.0 - CATWALK_THICKNESS/2.0,
+                                z + WALL_THICKNESS/2.0 + LADDER_WALL_OFFSET
+                            ),
+                            ..default()
                         },
-                    );
-                }
-                if has_path_east && !has_path_north && !has_path_south {
-                    let wall_height = get_wall_height(x, z);
-                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
+                        RigidBody::Static,
+                        Collider::cuboid(SAFETY_WALL_WIDTH, SAFETY_WALL_HEIGHT, SAFETY_WALL_THICKNESS),
+                    ));
+                } else if has_path_east && !has_path_north && !has_path_south {
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -573,10 +748,58 @@ pub fn spawn_maze(
                             rung_count: 150,
                         },
                     );
-                }
-                if has_path_west && !has_path_north && !has_path_south {
-                    let wall_height = get_wall_height(x, z);
-                    let ladder_height = wall_height + CATWALK_HEIGHT_OFFSET + CATWALK_THICKNESS + NEON_HEIGHT;
+
+                    commands.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(Cuboid::new(
+                                SAFETY_WALL_THICKNESS,
+                                SAFETY_WALL_HEIGHT,
+                                SAFETY_WALL_WIDTH
+                            )),
+                            material: catwalk_material.clone(),
+                            transform: Transform::from_xyz(
+                                x - WALL_THICKNESS/2.0 - LADDER_WALL_OFFSET,
+                                catwalk_y + SAFETY_WALL_HEIGHT/2.0 - CATWALK_THICKNESS/2.0,
+                                z
+                            ),
+                            ..default()
+                        },
+                        RigidBody::Static,
+                        Collider::cuboid(SAFETY_WALL_THICKNESS, SAFETY_WALL_HEIGHT, SAFETY_WALL_WIDTH),
+                    ));
+                } else if has_path_south && !has_path_east && !has_path_west {
+                    spawn_ladder(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        &asset_server,
+                        LadderConfig {
+                            position: Vec3::new(x, MAZE_POSITION.y, z + WALL_THICKNESS/2.0 + LADDER_WALL_OFFSET),
+                            rotation: Quat::from_rotation_y(std::f32::consts::PI * 1.5),
+                            height: ladder_height,
+                            rung_count: 150,
+                        },
+                    );
+
+                    commands.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(Cuboid::new(
+                                SAFETY_WALL_WIDTH,
+                                SAFETY_WALL_HEIGHT,
+                                SAFETY_WALL_THICKNESS
+                            )),
+                            material: catwalk_material.clone(),
+                            transform: Transform::from_xyz(
+                                x,
+                                catwalk_y + SAFETY_WALL_HEIGHT/2.0 - CATWALK_THICKNESS/2.0,
+                                z - WALL_THICKNESS/2.0 - LADDER_WALL_OFFSET
+                            ),
+                            ..default()
+                        },
+                        RigidBody::Static,
+                        Collider::cuboid(SAFETY_WALL_WIDTH, SAFETY_WALL_HEIGHT, SAFETY_WALL_THICKNESS),
+                    ));
+                } else if has_path_west && !has_path_north && !has_path_south {
                     spawn_ladder(
                         &mut commands,
                         &mut meshes,
@@ -589,6 +812,25 @@ pub fn spawn_maze(
                             rung_count: 150,
                         },
                     );
+
+                    commands.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(Cuboid::new(
+                                SAFETY_WALL_THICKNESS,
+                                SAFETY_WALL_HEIGHT,
+                                SAFETY_WALL_WIDTH
+                            )),
+                            material: catwalk_material.clone(),
+                            transform: Transform::from_xyz(
+                                x + WALL_THICKNESS/2.0 + LADDER_WALL_OFFSET,
+                                catwalk_y + SAFETY_WALL_HEIGHT/2.0 - CATWALK_THICKNESS/2.0,
+                                z
+                            ),
+                            ..default()
+                        },
+                        RigidBody::Static,
+                        Collider::cuboid(SAFETY_WALL_THICKNESS, SAFETY_WALL_HEIGHT, SAFETY_WALL_WIDTH),
+                    ));
                 }
             }
         }
@@ -675,7 +917,7 @@ fn count_adjacent_paths(maze: &Vec<Vec<Cell>>, x: usize, y: usize) -> usize {
         .count()
 }
 
-// Add new system to check player position relative to sphere
+// Update the check_dirigible_trigger function
 pub fn check_dirigible_trigger(
     trigger_query: Query<(Entity, &DirigibleTriggerZone)>,
     mut player_query: Query<(Entity, &Transform, &mut Protagonist)>,
@@ -683,6 +925,7 @@ pub fn check_dirigible_trigger(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
+    mut message_display: ResMut<MessageDisplay>,
 ) {
     if let (Ok((trigger_entity, trigger)), Ok((player_entity, player_transform, mut protagonist))) = (
         trigger_query.get_single(),
@@ -690,16 +933,20 @@ pub fn check_dirigible_trigger(
     ) {
         let player_pos = player_transform.translation;
         
-        // Check if player is within horizontal radius of sphere
         let horizontal_dist = Vec2::new(
             player_pos.x - trigger.position.x,
             player_pos.z - trigger.position.z
         ).length();
 
-        // Check if player is below sphere
         if horizontal_dist < trigger.radius * 1.5 && player_pos.y < trigger.position.y {
-            // Only trigger if not already in dirigible mode
             if !protagonist.is_dirigible {
+                // Display message using the same system as garage
+                display_message(
+                    "DIRIGIBLE MODE ACTIVATED - SPACE TO FLOAT, SHIFT TO DESCEND",
+                    Color::WHITE,
+                    &mut message_display
+                );
+
                 protagonist.is_dirigible = true;
                 protagonist.is_swimming = false;
                 protagonist.is_falling = false;

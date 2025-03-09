@@ -47,24 +47,6 @@ pub fn rotate_camera(
         }
 
         for (mut camera_transform, mut projection) in camera_query.iter_mut() {
-            // Update projection based on birds-eye view
-            if protagonist.is_birds_eye {
-                // Switch to orthographic projection when in birds-eye view
-                if let Projection::Perspective(_) = &*projection {
-                    *projection = Projection::Orthographic(OrthographicProjection {
-                        scale: 0.8,
-                        near: -1000.0,
-                        far: 1000.0,
-                        ..default()
-                    });
-                }
-            } else {
-                // Switch back to perspective projection when not in birds-eye view
-                if let Projection::Orthographic(orthographic) = &*projection {
-                    *projection = Projection::Perspective(PerspectiveProjection::default());
-                }
-            }
-
             // Adjust follow offset based on state
             let follow_offset = if protagonist.is_birds_eye {
                 Vec3::new(20.0, 150.0, 20.0) // Reduced height, added slight offset for depth perception

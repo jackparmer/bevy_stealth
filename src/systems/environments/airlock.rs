@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::math::primitives::{Cylinder, Sphere};
 use avian3d::prelude::*;
 use crate::components::Protagonist;
+use crate::systems::core::screenplay::{MessageDisplay, display_message};
 
 pub const AIRLOCK_RADIUS: f32 = 16.0;
 pub const AIRLOCK_LENGTH: f32 = 800.0;
@@ -183,14 +184,26 @@ pub fn handle_airlock_teleport(
     mut triggers: Query<(Entity, &mut AirlockTrigger)>,
     mut player: Query<(Entity, &mut Transform), With<Protagonist>>,
     mut velocity_query: Query<&mut LinearVelocity, With<Protagonist>>,
+    mut message_display: ResMut<MessageDisplay>,
 ) {
     if let Ok((player_entity, mut player_transform)) = player.get_single_mut() {
         for (trigger_entity, mut trigger) in &mut triggers {
             if collisions.contains(player_entity, trigger_entity) {
                 // If the cooldown is finished, teleport immediately
                 if trigger.cooldown.finished() {
+                    // Display appropriate message based on entry/exit
+                    if trigger.is_entry {
+                        display_message("ENTERING AIRLOCK", Color::WHITE, &mut message_display);
+                    } else {
+                        display_message("FIND THE GARAGE", Color::WHITE, &mut message_display);
+                    }
+                    
+                    // Small delay to allow message to be visible
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    
                     println!("Teleporting player! is_entry: {}", trigger.is_entry);
                     teleport_player(&mut player_transform, &mut velocity_query, trigger.is_entry);
+                    
                     trigger.cooldown.reset();
                 }
                 // Tick the timer while in contact

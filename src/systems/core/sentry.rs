@@ -9,8 +9,9 @@ use std::f32::consts::PI;
 use std::time::Duration;
 use crate::systems::core::minimap::{MinimapMarker, SentryMinimapMarker, MinimapResources, MINIMAP_MARKER_HEIGHT};
 use bevy::render::view::RenderLayers;
+use crate::systems::core::setup::ACQUIFIER_FLOOR_DEPTH;
 
-const SENTRY_SPAWN_INTERVAL: f32 = 1.0; // Reduced from 2.0 for more frequent spawns
+const SENTRY_SPAWN_INTERVAL: f32 = 10.0; // Increased from 1.0 for less frequent spawns
 
 // Sentry movement constants
 const SENTRY_VIEW_DISTANCE: f32 = 800.0;
@@ -109,14 +110,12 @@ pub struct SentryTiming {
 #[derive(Resource)]
 pub struct SentryCounter {
     count: usize,
-    max_allowed: usize,
 }
 
 impl Default for SentryCounter {
     fn default() -> Self {
         Self {
             count: 0,
-            max_allowed: 10, // Maximum number of sentries allowed
         }
     }
 }
@@ -192,12 +191,8 @@ fn spawn_sentry_at(
     spatial_query: &SpatialQuery,
     sentry_counter: &mut ResMut<SentryCounter>,
 ) -> bool {
-    if sentry_counter.count >= sentry_counter.max_allowed {
-        return false;
-    }
-
     // Cast a ray down to find the ground position
-    let ray_start = position + Vec3::new(0.0, 10.0, 0.0); // Start higher to ensure we find ground
+    let ray_start = position + Vec3::new(0.0, 10.0, 0.0);
     let ray_dir = Dir3::NEG_Y;
     let max_distance = 20.0;
     let filter = SpatialQueryFilter::default();
@@ -208,7 +203,7 @@ fn spawn_sentry_at(
         max_distance,
         1,
         true,
-        filter.clone()  // Clone the filter here
+        filter.clone()
     ).first().copied();
 
     // If we don't find ground, don't spawn
@@ -217,21 +212,6 @@ fn spawn_sentry_at(
     } else {
         return false;
     };
-
-    // Cast a ray up to check if position is inside a building
-    let overhead_hits = spatial_query.ray_hits(
-        ground_position + Vec3::new(0.0, 0.5, 0.0),
-        Dir3::Y,
-        max_distance,
-        1,
-        true,
-        filter
-    );
-
-    // If we have hits above, we're indoors
-    if !overhead_hits.is_empty() {
-        return false;
-    }
 
     let sentry_entity = commands.spawn((
         SceneBundle {       
@@ -387,14 +367,17 @@ pub fn sentry_follow_system(
         let direction = protagonist_pos - transform.translation;
         let distance = direction.length();
 
-        // More aggressive movement when closer
-        let speed_multiplier = if distance < SENTRY_CLOSE_RANGE_THRESHOLD {
+        // Update speed multiplier based on driving state
+        let driving_multiplier = if is_driving { 5.0 } else { 1.0 };
+
+        // More aggressive movement when closer, now including driving multiplier
+        let speed_multiplier = (if distance < SENTRY_CLOSE_RANGE_THRESHOLD {
             SENTRY_CLOSE_RANGE_MULTIPLIER
         } else if distance < SENTRY_MID_RANGE_THRESHOLD {
             SENTRY_MID_RANGE_MULTIPLIER
         } else {
             1.0
-        };
+        }) * driving_multiplier;  // Apply driving multiplier here
 
         if distance < sentry.view_distance {
             // Split movement into horizontal and vertical components
@@ -649,30 +632,31 @@ pub fn periodic_sentry_spawn(
 
     if timer.0.just_finished() {
         if let Ok((protagonist_transform, protagonist)) = protagonist_query.get_single() {
-            // Don't spawn if protagonist is swimming, in dirigible, or not outside
-            if protagonist.is_swimming || protagonist.is_dirigible || !protagonist.is_outside {
-                return;
-            }
-
-            // Try to spawn multiple sentries at once
-            let spawn_count = if rand::random::<f32>() < 0.3 { 2 } else { 1 };
-            
-            for _ in 0..spawn_count {
+            // Try to spawn 2 sentries instead of 3
+            for _ in 0..2 {
                 for _ in 0..5 {
                     let angle = rand::random::<f32>() * PI / 1.5 - PI / 3.0;
-                    let distance = 60.0 + rand::random::<f32>() * 100.0; // Closer spawn range (was 80-200)
+                    let distance = 60.0 + rand::random::<f32>() * 100.0;
                     
-                    // Calculate spawn position in front arc, but keep Y at ground level
                     let rotation = Quat::from_rotation_y(angle);
                     let spawn_direction = rotation * protagonist_transform.forward();
+                    
+                    // Adjust spawn height based on whether protagonist is swimming
+                    let spawn_y = if protagonist.is_swimming {
+                        // Spawn near the acquifier floor
+                        ACQUIFIER_FLOOR_DEPTH + 10.0 + rand::random::<f32>() * 20.0
+                    } else {
+                        3.0 // Default spawn height
+                    };
+                    
                     let spawn_pos = Vec3::new(
                         protagonist_transform.translation.x + spawn_direction.x * distance,
-                        3.0, // Fixed ground level height
+                        spawn_y,
                         protagonist_transform.translation.z + spawn_direction.z * distance,
                     );
                     
                     if spawn_sentry_at(&mut commands, &asset_server, &mut meshes, spawn_pos, &explosion_materials, &minimap_resources, &spatial_query, &mut sentry_counter) {
-                        break; // Successfully spawned
+                        break;
                     }
                 }
             }

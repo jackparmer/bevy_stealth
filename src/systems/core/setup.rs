@@ -20,27 +20,8 @@ use bevy::render::view::RenderLayers;
 
 // Constants for structure dimensions
 
-pub const GEOTHERMAL_BASE_HEIGHT: f32 = 250.0;
-pub const GEOTHERMAL_BASE_RADIUS: f32 = 100.0;
-pub const GEOTHERMAL_POSITION: Vec3 = Vec3::new(200.0, 0.0, 200.0);
-
-pub const RADIO_TOWER_HEIGHT: f32 = 400.0;
-pub const RADIO_TOWER_WIDTH: f32 = 25.0;
-pub const RADIO_TOWER_POSITION: Vec3 = Vec3::new(200.0, 200.0, 200.0);
-
-pub const BRIDGE_LENGTH: f32 = 300.0;
-pub const BRIDGE_HEIGHT: f32 = 10.0;
-pub const BRIDGE_WIDTH: f32 = 20.0;
-pub const BRIDGE_POSITION: Vec3 = Vec3::new(100.0, 394.99, 100.0);
-
-pub const TRAM_POSITION: Vec3 = Vec3::new(100.0, 245.5, 100.0);
-
 pub const WORLD_RADIUS: f32 = 10000.0;
-
-pub const TOWER_LADDER_START: Vec3 = Vec3::new(214.0, 200.0, 200.0);
-
 pub const PERIMETER_WALL_HEIGHT: f32 = 5000.0;
-
 pub const ACQUIFIER_FLOOR_DEPTH: f32 = -1000.0;
 
 pub struct ProtagonistStart {
@@ -104,7 +85,7 @@ pub fn setup(
         EnvironmentMapLight {
             diffuse_map: asset_server.load("environment_maps/pisa_diffuse_rgb9e5_zstd.ktx2"),
             specular_map: asset_server.load("environment_maps/pisa_specular_rgb9e5_zstd.ktx2"),
-            intensity: 25.0,
+            intensity: 5.0,
         }
 
     ));
@@ -112,7 +93,7 @@ pub fn setup(
     // Add Ambient Light
     commands.insert_resource(AmbientLight {
         color: Color::srgb(0.1, 0.1, 0.3),
-        brightness: 100.0,
+        brightness: 5.0,
     });
 
     // Add Directional Lighting
@@ -201,23 +182,6 @@ pub fn setup(
         },
     ));
 
-    // Starship
-    commands.spawn((
-        SceneBundle {
-            scene: asset_server
-                .load(GltfAssetLabel::Scene(0).from_asset("models/starhopper.glb")),
-            transform: Transform::from_xyz(
-                RADIO_TOWER_POSITION.x, 
-                RADIO_TOWER_POSITION.y + RADIO_TOWER_HEIGHT/2.0, 
-                RADIO_TOWER_POSITION.z
-            )
-                .with_scale(Vec3::splat(1.0)),
-            ..default()
-        },
-        ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMesh),
-        RigidBody::Static,
-    ));
-
     // Replace the glacier generation code with:
     spawn_glaciers(&mut commands, &asset_server);
 
@@ -255,7 +219,23 @@ pub fn setup(
         },
         RenderLayers::from_layers(&[0, 1]),
         Name::new("Protagonist"),
-    ));
+    )).with_children(|parent| {
+        // Add spotlight as child of protagonist
+        parent.spawn(SpotLightBundle {
+            transform: Transform::from_xyz(0.0, 15.0, 2.0) // Higher and slightly behind
+                .looking_at(Vec3::new(0.0, 0.0, -10.0), Vec3::Y), // Point forward and down
+            spot_light: SpotLight {
+                intensity: 5000000.0, // Increased brightness
+                color: Color::srgb(1.0, 0.95, 0.9), // Slightly warmer white
+                outer_angle: 0.5,  // Slightly narrower beam
+                inner_angle: 0.2,  // More focused core
+                shadows_enabled: true,
+                range: 50.0, // Explicit range to control falloff
+                ..default()
+            },
+            ..default()
+        });
+    });
 
     // Load the stars texture
     let stars_texture_handle = asset_server.load("textures/8k_stars.png");
@@ -279,45 +259,6 @@ pub fn setup(
             ..default()
         },
         Name::new("SkyDome"),
-    ));
-
-    // Geothermal station base (before radio tower)
-    commands.spawn((
-        RigidBody::Static,
-        Collider::capsule(GEOTHERMAL_BASE_RADIUS, GEOTHERMAL_BASE_HEIGHT),
-        PbrBundle {
-            mesh: meshes.add(Capsule3d {
-                radius: GEOTHERMAL_BASE_RADIUS,
-                half_length: GEOTHERMAL_BASE_HEIGHT / 2.0,
-            }),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/concrete.png")),
-                perceptual_roughness: 0.9,
-                metallic: 0.1,
-                ..default()
-            }),
-            transform: Transform::from_translation(GEOTHERMAL_POSITION),
-            ..default()
-        },
-        Name::new("GeothermalBase"),
-    ));
-
-    // Radio tower
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(RADIO_TOWER_WIDTH, RADIO_TOWER_HEIGHT, RADIO_TOWER_WIDTH),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(RADIO_TOWER_WIDTH, RADIO_TOWER_HEIGHT, RADIO_TOWER_WIDTH)),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/concrete.png")),
-                perceptual_roughness: 0.9,
-                metallic: 0.1,
-                ..default()
-            }),
-            transform: Transform::from_translation(RADIO_TOWER_POSITION),
-            ..default()
-        },
-        Name::new("RadioTower"),
     ));
 
     // Large white cylinder tundra
@@ -395,63 +336,6 @@ pub fn setup(
         Name::new("InvisibleFloor"),
     )).insert(Transform::from_xyz(0.0, -5.2, 0.0));  // 5 units below SubFloor
 
-    // Concrete bridge connecting platform to main area
-    commands.spawn((
-        RigidBody::Static,
-        Collider::cuboid(BRIDGE_LENGTH, BRIDGE_HEIGHT, BRIDGE_WIDTH),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(BRIDGE_LENGTH, BRIDGE_HEIGHT, BRIDGE_WIDTH)),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/concrete.png")),
-                perceptual_roughness: 0.9,
-                metallic: 0.1,
-                ..default()
-            }),
-            transform: Transform::from_translation(BRIDGE_POSITION)
-                .with_rotation(Quat::from_rotation_y(-std::f32::consts::FRAC_PI_4)),
-            ..default()
-        },
-        Name::new("Bridge"),
-    ));
-
-    // Spawn the tram car platform
-    commands.spawn((
-        RigidBody::Kinematic,
-        Collider::cuboid(5.0, 1.0, 5.0),
-        PbrBundle {
-            mesh: meshes.add(Cuboid::new(5.0, 1.0, 5.0)),
-            material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/container_metal.png")),
-                metallic: 0.8,
-                perceptual_roughness: 0.3,
-                ..default()
-            }),
-            transform: Transform::from_translation(TRAM_POSITION)
-                .with_rotation(Quat::from_rotation_y(-std::f32::consts::FRAC_PI_4)),
-            ..default()
-        },
-        TramCar {
-            origin: TRAM_POSITION,
-            time: 0.0,
-            amplitude: 100.0,
-            frequency: 0.3,
-        },
-        Name::new("TramCar"),
-    ));
-
-    // Replace the ladder spawn with the new configured version
-    spawn_ladder(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &asset_server,
-        LadderConfig {
-            position: TOWER_LADDER_START,
-            rotation: Quat::IDENTITY,
-            height: 150.0,
-            rung_count: 200,
-        },
-    );   
 
     spawn_ice_cave(&mut commands, &mut meshes, &mut materials, &asset_server, &time);
 

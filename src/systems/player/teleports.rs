@@ -1,7 +1,6 @@
 use bevy::prelude::*;
-use crate::systems::core::setup::{
+use crate::systems::environments::geothermal::{
     RADIO_TOWER_POSITION,
-    TRAM_POSITION,
     // Heights
     GEOTHERMAL_BASE_HEIGHT,
     RADIO_TOWER_HEIGHT,
@@ -67,8 +66,6 @@ pub fn teleport_system(
         pos.y += GEOTHERMAL_BASE_HEIGHT + 20.0;
         pos.z += LADDER_WIDTH / 2.0;
         Some((pos, "Ladder"))
-    } else if keyboard.just_pressed(KeyCode::Digit7) {
-        Some((TRAM_POSITION, "Tram"))
     } else if keyboard.just_pressed(KeyCode::Digit8) {
         let pos = Vec3::new(
             40.0, 

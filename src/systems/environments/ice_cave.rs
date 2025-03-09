@@ -4,7 +4,7 @@ use avian3d::prelude::*;
 use fastrand;
 use crate::components::Protagonist;
 use crate::systems::player::driving::set_driving_state;
-use bevy::math::Vec4;
+use crate::systems::core::screenplay::{MessageDisplay, display_message};
 
 // Cave dimensions
 const CAVE_POSITION_X: f32 = 1194.7814;
@@ -33,8 +33,8 @@ const PARTICLE_MIN_SPEED: f32 = 0.5;
 const PARTICLE_MAX_SPEED: f32 = 1.5;
 const PARTICLE_MAX_HEIGHT: f32 = 800.0;
 const PARTICLE_MAX_RADIUS: f32 = 500.0;
-const PARTICLE_BASE_COLOR: Color = Color::srgb(0.95, 0.98, 1.0);
-const PARTICLE_EMISSIVE_STRENGTH: f32 = 0.05;
+const PARTICLE_BASE_COLOR: Color = Color::srgb(0.85, 0.92, 0.99);
+const PARTICLE_EMISSIVE_STRENGTH: f32 = 0.08;
 const PARTICLE_LIFETIME: f32 = 20.0;
 const PARTICLE_ROOT_COUNT: i32 = 12;  // Number of root points for particle spawning
 const PARTICLE_ROOT_SPREAD: f32 = 30.0;  // Spread radius for root particles
@@ -212,6 +212,24 @@ pub fn spawn_ice_cave(
             },
         ));
     }
+
+    // Add transportation disc
+    let disc_material = materials.add(StandardMaterial {
+        base_color: Color::srgba(0.2, 0.4, 0.99, 0.8),
+        emissive: Color::srgb(0.0, 0.2, 0.99).into(),
+        alpha_mode: AlphaMode::Blend,
+        metallic: 0.8,
+        perceptual_roughness: 0.1,
+        ..default()
+    });
+
+    commands.spawn(PbrBundle {
+        mesh: meshes.add(Circle::new(50.0)),  // 50.0 radius disc
+        material: disc_material,
+        transform: Transform::from_translation(position + Vec3::new(0.0, 1.0, 0.0))  // Slightly above ground
+            .with_rotation(Quat::from_rotation_x(-PI / 2.0)),  // Lay flat
+        ..default()
+    });
 }
 
 // Add this component
@@ -306,10 +324,13 @@ pub fn update_ice_particles(
 // Add this system
 pub fn handle_ice_cave_interactions(
     mut query_set: ParamSet<(
-        Query<(&mut Transform, &mut Protagonist, &mut Handle<Scene>)>,
+        Query<(Entity, &mut Transform, &mut Protagonist, &mut Handle<Scene>)>,
         Query<&Transform, With<IceCaveParticle>>,
     )>,
+    mut commands: Commands,
+    children_query: Query<&Children>,
     asset_server: Res<AssetServer>,
+    mut message_display: ResMut<MessageDisplay>,
 ) {
     let cave_pos = Vec3::new(CAVE_POSITION_X, CAVE_POSITION_Y, CAVE_POSITION_Z);
     
@@ -320,7 +341,7 @@ pub fn handle_ice_cave_interactions(
         .collect();
 
     // Then handle protagonist
-    if let Ok((mut transform, mut protagonist, mut scene)) = query_set.p0().get_single_mut() {
+    if let Ok((entity, mut transform, mut protagonist, mut scene)) = query_set.p0().get_single_mut() {
         // Check if inside cave (using horizontal distance)
         let horizontal_distance = Vec2::new(
             transform.translation.x - cave_pos.x,
@@ -331,7 +352,16 @@ pub fn handle_ice_cave_interactions(
         let vertical_distance = (transform.translation.y - cave_pos.y).abs();
         if horizontal_distance < CAVE_RADIUS && vertical_distance < CAVE_HEIGHT / 2.0 {
             if protagonist.is_driving {
-                set_driving_state(&mut protagonist, &mut scene, &asset_server, false);
+                set_driving_state(
+                    &mut protagonist,
+                    &mut scene,
+                    &asset_server,
+                    false,
+                    &mut commands,
+                    entity,
+                    &children_query
+                );
+                display_message("FIND THE ACQUIFIER", Color::srgb(0.0, 0.2, 1.0), &mut message_display);
             }
         }
 

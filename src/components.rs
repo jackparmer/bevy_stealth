@@ -47,3 +47,8 @@ pub struct Sentry {
 #[derive(Component)]
 pub struct Tank;
 
+#[derive(Component)]
+pub struct MazeMessageTrigger {
+    pub triggered: bool,
+}
+

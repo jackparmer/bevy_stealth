@@ -6,12 +6,14 @@ use crate::resources::{ProtagonistAnimations, PROTAGONIST_ANIMATIONS};
 use std::time::Duration;
 
 pub fn check_falling(
-    mut protagonist_query: Query<(Entity, &mut Protagonist, &Transform, &LinearVelocity)>,
+    mut commands: Commands,
+    mut protagonist_query: Query<(Entity, &mut Protagonist, &Transform, &LinearVelocity, &Children)>,
+    mut spotlight_query: Query<&mut SpotLight>,
     spatial_query: SpatialQuery,
     mut gizmos: Gizmos,
     mut ambient_light: ResMut<AmbientLight>,
 ) {
-    for (entity, mut protagonist, transform, _velocity) in protagonist_query.iter_mut() {
+    for (entity, mut protagonist, transform, _velocity, children) in protagonist_query.iter_mut() {
         // Don't check falling for vehicles at all
         if protagonist.is_driving {
             continue;  // Skip the entire check for vehicles
@@ -46,9 +48,20 @@ pub fn check_falling(
         // Update is_outside status and adjust ambient light based on overhead hits
         protagonist.is_outside = overhead_hits.is_empty();
         if !protagonist.is_outside {
-            ambient_light.brightness = 2000.0; // Reduced brightness when under cover
+            ambient_light.brightness = 200.0; // Reduced brightness when under cover
+            for child in children {
+                if let Ok(mut spotlight) = spotlight_query.get_mut(*child) {
+                    spotlight.intensity = 0.0;
+                }
+            }
         } else {
-            ambient_light.brightness = 6000.0; // Normal brightness in open areas
+            ambient_light.brightness = 400.0; // Normal brightness in open areas
+            // Turn on spotlight when outside
+            for child in children {
+                if let Ok(mut spotlight) = spotlight_query.get_mut(*child) {
+                    spotlight.intensity = 5000000.0;
+                }
+            }
         }
 
         let ray_pos = transform.translation + Vec3::new(0.0, 0.5, 0.0);
