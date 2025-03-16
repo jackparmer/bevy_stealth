@@ -14,10 +14,6 @@ pub const DIRIGIBLE_DAMPENING: f32 = 0.1;
 pub const DIRIGIBLE_MAX_HORIZONTAL_SPEED: f32 = 500.0;
 pub const DIRIGIBLE_MAX_VERTICAL_SPEED: f32 = 100.0;
 
-// Animation constants
-pub const DIRIGIBLE_SWAY_AMPLITUDE: f32 = 0.1;
-pub const DIRIGIBLE_SWAY_FREQUENCY: f32 = 0.2;
-
 // Make the marker component public
 #[derive(Component)]
 pub struct DirigibleBalloon;
@@ -143,9 +139,6 @@ pub fn dirigible_control(
                 DIRIGIBLE_ACCELERATION * time.delta_seconds()
             );
         }
-
-        let sway = DIRIGIBLE_SWAY_AMPLITUDE * (time.elapsed_seconds() * DIRIGIBLE_SWAY_FREQUENCY).sin();
-        transform.rotate_local_z(sway * time.delta_seconds() * DIRIGIBLE_DAMPENING);
 
         // Position clamping
         let pos = transform.translation;

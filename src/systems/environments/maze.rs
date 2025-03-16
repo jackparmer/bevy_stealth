@@ -330,7 +330,6 @@ fn spawn_dirigible_trigger(
             material: materials.add(StandardMaterial {
                 base_color: Color::srgb(1.0, 1.0, 1.0),
                 base_color_texture: Some(asset_server.load("textures/american-flag-background.png")),
-                emissive: Color::srgb(0.1, 0.1, 0.1).into(),
                 metallic: 0.8,
                 perceptual_roughness: 0.1,
                 reflectance: 0.7,
