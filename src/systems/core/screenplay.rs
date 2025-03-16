@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::systems::core::setup::PROTAGONIST_START;
 use crate::systems::environments::launch_silo::WALL_Y_POSITION;
 use crate::systems::environments::ladder::LADDER_START;
-use crate::systems::environments::garage::GARAGE_POSITION;
+use crate::systems::environments::garage::{GARAGE_POSITION_1, GARAGE_POSITION_2};
 use crate::systems::environments::geothermal::RADIO_TOWER_POSITION;
 
 // Import constants from teleports.rs
@@ -13,7 +13,6 @@ use crate::systems::player::teleports::{
     OUTSIDE,
     REACTOR,
     ICE_CAVE_POSITION,
-    MAZE_START,
 };
 
 use crate::components::Protagonist;
@@ -22,8 +21,33 @@ const TEXT_DISPLAY_DURATION: f32 = 5.0; // seconds
 const TRIGGER_DISTANCE: f32 = 20.0; // units
 
 const OUTSIDE_AIRLOCK: Vec3 = Vec3::new(924.9679, 2.8701305, -430.01);
+const AIRLOCK_DOORS: Vec3 = Vec3::new(437.97876, 2.624982, -395.71606);
+const VEHICLE_SHELTER: Vec3 = Vec3::new(1420.3849, 2.6249862, -505.01404);
+const WRONG_WAY: Vec3 = Vec3::new(3073.6443, 5.597332, -69.24335);
+const PROTAGONIST_POSITION: Vec3 = Vec3::new(1383.2694, 3.992052, -20.53674);
+
+// Add new constant for the acquifier message trigger position
+const ACQUIFIER_HINT: Vec3 = Vec3::new(1856.5652, 3.992052, -6542.7266);
+
+// Change from const to pub const
+pub const TANK_EXIT_POSITION: Vec3 = Vec3::new(1920.8418, 3.992052, 6551.8755);
+
+// Add new constant after other position constants
+const TANK_HINT_POSITION: Vec3 = Vec3::new(2158.844, 3.992052, 6459.8257);
+
+// Add new constant after other position constants
+const LEVEL_COMPLETE_POSITION: Vec3 = Vec3::new(-398.6294, 800.12476, -397.60477);
 
 const SEQUENCES: &[(&str, &[(&str, Color)])] = &[
+    ("tank_exit", &[
+        ("CLIMB THE LADDER", Color::WHITE),
+    ]),
+    ("acquifier_hint", &[
+        ("FIND THE ACQUIFIER ENTRY", Color::WHITE),
+    ]),
+    ("protagonist_area", &[
+        ("Follow the emergency lanterns", Color::WHITE),
+    ]),
     ("start", &[
         ("Follow the light...", Color::WHITE),
         ("RUN (Shift-W). A sentry is behind you.", Color::srgb(1.0, 0.0, 0.0)),
@@ -41,10 +65,20 @@ const SEQUENCES: &[(&str, &[(&str, Color)])] = &[
         ("Get to the ice cave...", Color::WHITE),
         ("Find the acquifier...", Color::WHITE),
     ]),
-    ("maze", &[
-        ("The maintenance tunnels...", Color::WHITE),
-        ("These tunnels were used by the engineers.", Color::WHITE),
-        ("Watch out for sentries...", Color::srgb(1.0, 0.0, 0.0)),
+    ("airlock_doors", &[
+        ("Pry the airlock doors...", Color::WHITE),
+    ]),
+    ("vehicle_shelter", &[
+        ("Shelter in the vehicle...", Color::srgb(1.0, 0.0, 0.0)),
+    ]),
+    ("wrong_way", &[
+        ("Wrong way - turn around", Color::srgb(1.0, 0.0, 0.0)),
+    ]),
+    ("tank_hint", &[
+        ("PRESS T TO EXIT THE TANK", Color::WHITE),
+    ]),
+    ("level_complete", &[
+        ("LEVEL 0 COMPLETED", Color::WHITE),
     ]),
 ];
 
@@ -95,8 +129,9 @@ pub fn setup_screenplay(mut commands: Commands) {
             NodeBundle {
                 style: Style {
                     position_type: PositionType::Absolute,
-                    bottom: Val::Px(20.0),
-                    left: Val::Percent(5.0),
+                    top: Val::Px(20.0),
+                    left: Val::Percent(50.0),
+                    margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(0.0), Val::Px(0.0)),
                     ..default()
                 },
                 ..default()
@@ -111,7 +146,11 @@ pub fn setup_screenplay(mut commands: Commands) {
                         color: Color::WHITE,
                         ..default()
                     },
-                ),
+                )
+                .with_style(Style {
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                }),
                 ScreenplayText,
             ));
         });
@@ -158,11 +197,27 @@ pub fn screenplay_system(
             let pos = protagonist_transform.translation;
             
             // Check trigger conditions for each sequence
-            let triggered_sequence = if !message_state.completed_sequences.contains(&"start".to_string()) &&
+            let triggered_sequence = if pos.distance(LEVEL_COMPLETE_POSITION) < TRIGGER_DISTANCE {
+                Some("level_complete")
+            } else if pos.distance(TANK_HINT_POSITION) < TRIGGER_DISTANCE {
+                Some("tank_hint")
+            } else if pos.distance(TANK_EXIT_POSITION) < TRIGGER_DISTANCE {
+                Some("tank_exit")
+            } else if pos.distance(ACQUIFIER_HINT) < TRIGGER_DISTANCE {
+                Some("acquifier_hint")
+            } else if pos.distance(PROTAGONIST_POSITION) < TRIGGER_DISTANCE {
+                Some("protagonist_area")
+            } else if !message_state.completed_sequences.contains(&"start".to_string()) &&
                 (pos.distance(GAME_START) < TRIGGER_DISTANCE ||
                  pos.distance(PROTAGONIST_START.position) < TRIGGER_DISTANCE) {
                 Some("start")
-            } else if pos.distance(GARAGE_POSITION) < TRIGGER_DISTANCE {
+            } else if pos.distance(AIRLOCK_DOORS) < TRIGGER_DISTANCE {
+                Some("airlock_doors")
+            } else if pos.distance(VEHICLE_SHELTER) < TRIGGER_DISTANCE {
+                Some("vehicle_shelter")
+            } else if pos.distance(WRONG_WAY) < TRIGGER_DISTANCE {
+                Some("wrong_way")
+            } else if pos.distance(GARAGE_POSITION_1) < TRIGGER_DISTANCE || pos.distance(GARAGE_POSITION_2) < TRIGGER_DISTANCE {
                 Some("garage")
             } else if pos.distance(RADIO_TOWER_POSITION) < TRIGGER_DISTANCE {
                 Some("radio_tower")
@@ -180,8 +235,6 @@ pub fn screenplay_system(
                 Some("outside")
             } else if pos.distance(REACTOR) < TRIGGER_DISTANCE {
                 Some("reactor")
-            } else if pos.distance(MAZE_START) < TRIGGER_DISTANCE {
-                Some("maze")
             } else {
                 None
             };

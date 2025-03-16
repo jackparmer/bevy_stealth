@@ -5,14 +5,15 @@ use crate::systems::player::driving::set_driving_state;
 use crate::systems::core::screenplay::{MessageDisplay, display_message};
 
 // Constants for the garage structure
-pub const GARAGE_POSITION: Vec3 = Vec3::new(1800.4492, 2.6249862, -707.7545); // Near protagonist position
+pub const GARAGE_POSITION_1: Vec3 = Vec3::new(1800.4492, 2.6249862, -707.7545); // Near protagonist position
+pub const GARAGE_POSITION_2: Vec3 = Vec3::new(-6575.283, 2.624908, 9846.279);
 const ROOF_WIDTH: f32 = 360.0;
 const ROOF_LENGTH: f32 = 360.0;
 const ROOF_HEIGHT: f32 = 180.0;
 const ROOF_THICKNESS: f32 = 12.0;
 const PILLAR_WIDTH: f32 = 24.0;
-const LIGHT_PANEL_THICKNESS: f32 = 24.0;
-const LIGHT_PANEL_OFFSET: f32 = 24.0;
+const LIGHT_PANEL_THICKNESS: f32 = 4.0;
+const LIGHT_PANEL_OFFSET: f32 = 12.0;
 
 // Add new constant for trigger volume
 const TRIGGER_VOLUME_SIZE: Vec3 = Vec3::new(600.0, 100.0, 600.0);
@@ -22,10 +23,11 @@ const TRIGGER_VOLUME_SIZE: Vec3 = Vec3::new(600.0, 100.0, 600.0);
 pub struct GarageRingLight;
 
 pub fn spawn_garage(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    asset_server: Res<AssetServer>,
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    asset_server: &Res<AssetServer>,
+    position: Vec3,
 ) {
     // Load the rusty metal texture
     let metal_texture = asset_server.load("textures/rusty_metal_02_diff_4k.png");
@@ -40,14 +42,14 @@ pub fn spawn_garage(
                 metallic: 0.1,
                 ..default()
             }),
-            transform: Transform::from_translation(GARAGE_POSITION + Vec3::new(0.0, ROOF_HEIGHT, 0.0)),
+            transform: Transform::from_translation(position + Vec3::new(0.0, ROOF_HEIGHT, 0.0)),
             ..default()
         },
         RigidBody::Static,
         Collider::cuboid(ROOF_WIDTH/2.0, ROOF_THICKNESS/2.0, ROOF_LENGTH/2.0),
     ));
 
-    // Update pillars to use the same rusty metal texture
+    // Fix pillar positions - remove the double position addition
     let pillar_positions = [
         Vec3::new(-ROOF_WIDTH/2.0 + PILLAR_WIDTH/2.0, ROOF_HEIGHT/2.0, -ROOF_LENGTH/2.0 + PILLAR_WIDTH/2.0),
         Vec3::new(ROOF_WIDTH/2.0 - PILLAR_WIDTH/2.0, ROOF_HEIGHT/2.0, -ROOF_LENGTH/2.0 + PILLAR_WIDTH/2.0),
@@ -55,7 +57,7 @@ pub fn spawn_garage(
         Vec3::new(ROOF_WIDTH/2.0 - PILLAR_WIDTH/2.0, ROOF_HEIGHT/2.0, ROOF_LENGTH/2.0 - PILLAR_WIDTH/2.0),
     ];
 
-    for position in pillar_positions {
+    for pillar_pos in pillar_positions {
         commands.spawn((
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(PILLAR_WIDTH, ROOF_HEIGHT, PILLAR_WIDTH)),
@@ -65,7 +67,7 @@ pub fn spawn_garage(
                     metallic: 0.1,
                     ..default()
                 }),
-                transform: Transform::from_translation(GARAGE_POSITION + position),
+                transform: Transform::from_translation(position + pillar_pos),  // Fixed position calculation
                 ..default()
             },
             RigidBody::Static,
@@ -73,7 +75,7 @@ pub fn spawn_garage(
         ));
     }
 
-    // Spawn emissive white light panel with increased thickness
+    // Spawn thinner emissive white light panel
     commands.spawn(PbrBundle {
         mesh: meshes.add(Cuboid::new(ROOF_WIDTH - 8.0, LIGHT_PANEL_THICKNESS, ROOF_LENGTH - 8.0)),
         material: materials.add(StandardMaterial {
@@ -82,12 +84,12 @@ pub fn spawn_garage(
             ..default()
         }),
         transform: Transform::from_translation(
-            GARAGE_POSITION + Vec3::new(0.0, ROOF_HEIGHT - LIGHT_PANEL_OFFSET, 0.0)
+            position + Vec3::new(0.0, ROOF_HEIGHT - LIGHT_PANEL_OFFSET, 0.0)
         ),
         ..default()
     });
 
-    // Spawn emissive blue light panel with increased thickness (directly below white panel)
+    // Spawn thinner emissive blue light panel
     commands.spawn(PbrBundle {
         mesh: meshes.add(Cuboid::new(ROOF_WIDTH - 16.0, LIGHT_PANEL_THICKNESS, ROOF_LENGTH - 16.0)),
         material: materials.add(StandardMaterial {
@@ -96,7 +98,7 @@ pub fn spawn_garage(
             ..default()
         }),
         transform: Transform::from_translation(
-            GARAGE_POSITION + Vec3::new(0.0, ROOF_HEIGHT - LIGHT_PANEL_OFFSET - LIGHT_PANEL_THICKNESS, 0.0)
+            position + Vec3::new(0.0, ROOF_HEIGHT - LIGHT_PANEL_OFFSET - LIGHT_PANEL_THICKNESS, 0.0)
         ),
         ..default()
     });
@@ -105,7 +107,7 @@ pub fn spawn_garage(
     commands.spawn((
         SceneBundle {
             scene: asset_server.load("models/KB03-apc.glb#Scene0"),
-            transform: Transform::from_translation(GARAGE_POSITION + Vec3::new(0.0, 0.0, 0.0))
+            transform: Transform::from_translation(position + Vec3::new(0.0, 0.0, 0.0))
                 .with_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2))  // 90-degree rotation
                 .with_scale(Vec3::splat(6.0)),
             ..default()
@@ -133,7 +135,7 @@ pub fn spawn_garage(
                 range: 300.0,
                 ..default()
             },
-            transform: Transform::from_translation(GARAGE_POSITION + position),
+            transform: Transform::from_translation(position + position),
             ..default()
         });
     }
@@ -149,8 +151,8 @@ pub fn spawn_garage(
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_translation(GARAGE_POSITION + Vec3::new(0.0, 10.0, 0.0))
-            .looking_at(GARAGE_POSITION, Vec3::Y),
+        transform: Transform::from_translation(position + Vec3::new(0.0, 10.0, 0.0))
+            .looking_at(position, Vec3::Y),
         ..default()
     });
 
@@ -172,7 +174,7 @@ pub fn spawn_garage(
                     range: 150.0,
                     ..default()
                 },
-                transform: Transform::from_translation(GARAGE_POSITION + Vec3::new(x, RING_HEIGHT, z)),
+                transform: Transform::from_translation(position + Vec3::new(x, RING_HEIGHT, z)),
                 ..default()
             },
             GarageRingLight,  // Add this component
@@ -181,23 +183,35 @@ pub fn spawn_garage(
 
     // Add trigger volume around the garage
     commands.spawn((
-        TransformBundle::from(Transform::from_translation(GARAGE_POSITION)),
+        TransformBundle::from(Transform::from_translation(position)),
         Sensor,
         Collider::cuboid(TRIGGER_VOLUME_SIZE.x/2.0, TRIGGER_VOLUME_SIZE.y/2.0, TRIGGER_VOLUME_SIZE.z/2.0),
         Name::new("GarageTrigger"),
     ));
 }
 
+// Create a system that spawns both garages
+pub fn spawn_garages(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
+) {
+    spawn_garage(&mut commands, &mut meshes, &mut materials, &asset_server, GARAGE_POSITION_1);
+    spawn_garage(&mut commands, &mut meshes, &mut materials, &asset_server, GARAGE_POSITION_2);
+}
+
 pub fn handle_tank_interaction(
     mut commands: Commands,
     mut collision_events: EventReader<CollisionStarted>,
-    tank_query: Query<Entity, With<Tank>>,
+    tank_query: Query<(Entity, &Transform), With<Tank>>,
     mut protagonist_query: Query<(Entity, &mut Protagonist, &mut Handle<Scene>)>,
     children_query: Query<&Children>,
     ring_lights_query: Query<Entity, With<GarageRingLight>>,
     asset_server: Res<AssetServer>,
     mut message_display: ResMut<MessageDisplay>,
     time: Res<Time>,
+    transform_query: Query<&Transform>,
 ) {
     if time.elapsed_seconds() < 1.0 {
         collision_events.clear();
@@ -205,9 +219,7 @@ pub fn handle_tank_interaction(
     }
 
     for CollisionStarted(e1, e2) in collision_events.read() {
-        let tank = tank_query.iter().next();
-        
-        if let Some(tank_entity) = tank {
+        if let Some((tank_entity, tank_transform)) = tank_query.iter().next() {
             if *e1 == tank_entity || *e2 == tank_entity {
                 if let Ok((protagonist_entity, mut protagonist, mut scene)) = protagonist_query.get_single_mut() {
                     info!("Tank interaction triggered!");
@@ -221,8 +233,18 @@ pub fn handle_tank_interaction(
                         true,
                         &mut commands,
                         protagonist_entity,
-                        &children_query
+                        &children_query,
                     );
+                    
+                    // Determine which garage we're in based on position
+                    let message = if tank_transform.translation.distance(GARAGE_POSITION_1) < 100.0 {
+                        "FIND THE AQUIFER ENTRY"
+                    } else {
+                        "FIND THE CONSTRUCTION SITE"
+                    };
+                    
+                    // Display the appropriate message
+                    display_message(message, Color::srgb(0.01, 0.55, 0.99), &mut message_display);
                     
                     // Despawn the tank after setting driving state
                     commands.entity(tank_entity).despawn_recursive();
@@ -231,9 +253,6 @@ pub fn handle_tank_interaction(
                     for ring_light in ring_lights_query.iter() {
                         commands.entity(ring_light).despawn_recursive();
                     }
-                    
-                    // Display message when entering the tank
-                    display_message("DRIVE TO ICE CAVE", Color::srgb(0.01, 0.55, 0.99), &mut message_display);
                 }
             }
         }

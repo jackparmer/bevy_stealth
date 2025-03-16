@@ -25,8 +25,8 @@ const HEIGHT_MULTIPLIER_NORMAL: f32 = 1.0;
 // Swimming speed multipliers
 const SWIM_SPEED_BOOST: f32 = 20.0;
 const SWIM_SPEED_NORMAL: f32 = 10.0;
-const SWIM_SPEED_BACKWARD_MULTIPLIER: f32 = 0.25;  // 4x slower for backward swimming
-const SWIM_SPEED_VERTICAL_MULTIPLIER: f32 = 0.25;  // 4x slower for vertical swimming
+const SWIM_SPEED_BACKWARD_MULTIPLIER: f32 = 0.1;
+const SWIM_SPEED_VERTICAL_MULTIPLIER: f32 = 0.1;
 
 // Teleportation distances
 const TELEPORT_DOWN_DISTANCE: f32 = 10.0;
@@ -412,11 +412,11 @@ pub fn keyboard_animation_control(
                                 info!("Walking jump detected");
                                 JUMP_FORWARD_NORMAL
                             };
-                            
+
                             let forward_impulse = protagonist_transform.forward() * forward_strength;
                             info!("Forward direction: {:?}", protagonist_transform.forward());
                             info!("Forward impulse component: {:?}", forward_impulse);
-                            
+
                             jump_impulse += forward_impulse;
                             
                             // Increase vertical impulse for running leap
@@ -425,7 +425,7 @@ pub fn keyboard_animation_control(
                                 info!("Increased vertical impulse for running: {}", JUMP_VERTICAL_RUNNING);
                             }
                         }
-                        
+
                         info!("Final jump impulse: {:?}", jump_impulse);
                         impulse.apply_impulse(jump_impulse);
                         

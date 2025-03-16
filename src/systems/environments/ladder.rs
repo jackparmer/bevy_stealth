@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use avian3d::prelude::*;
+use crate::components::Protagonist;
 
 // Ladder dimensions
 pub const LADDER_HEIGHT: f32 = 150.0;
@@ -92,7 +93,7 @@ pub fn spawn_ladder(
                         base_color: Color::srgb(0.7, 0.7, 0.7),
                         perceptual_roughness: 0.9,
                         metallic: 0.8,
-                        emissive: Color::srgb(0.2, 0.2, 0.3).into(),
+                        emissive: Color::srgb(0.99, 0.0, 0.0).into(),
                         ..default()
                     }),
                     transform: Transform::from_translation(Vec3::new(
@@ -164,4 +165,43 @@ pub fn spawn_ladder(
             },
         ));
     });
+}
+
+pub fn handle_ladder_top(
+    mut collision_started: EventReader<CollisionStarted>,
+    mut protagonist_query: Query<(Entity, &mut Transform, &mut Protagonist)>,
+    mut velocity_query: Query<&mut LinearVelocity>,
+    name_query: Query<&Name>,
+) {
+    for collision in collision_started.read() {
+        if let Ok((entity, mut transform, mut protagonist)) = protagonist_query.get_mut(collision.0) {
+            if name_query.get(collision.1).map_or(false, |name| name.as_str() == "LadderTopSensor") {
+                if protagonist.is_climbing {
+                    let forward = transform.forward().as_vec3();
+                    transform.translation.y += 2.0;
+                    transform.translation += forward * 2.0;
+                    protagonist.is_climbing = false;
+                    
+                    // Zero out velocity
+                    if let Ok(mut velocity) = velocity_query.get_mut(entity) {
+                        velocity.0 = Vec3::ZERO;
+                    }
+                }
+            }
+        } else if let Ok((entity, mut transform, mut protagonist)) = protagonist_query.get_mut(collision.1) {
+            if name_query.get(collision.0).map_or(false, |name| name.as_str() == "LadderTopSensor") {
+                if protagonist.is_climbing {
+                    let forward = transform.forward().as_vec3();
+                    transform.translation.y += 2.0;
+                    transform.translation += forward * 2.0;
+                    protagonist.is_climbing = false;
+                    
+                    // Zero out velocity
+                    if let Ok(mut velocity) = velocity_query.get_mut(entity) {
+                        velocity.0 = Vec3::ZERO;
+                    }
+                }
+            }
+        }
+    }
 }

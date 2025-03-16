@@ -1,18 +1,18 @@
 use bevy::prelude::*;
 use avian3d::prelude::*;
 
-pub const GEOTHERMAL_BASE_HEIGHT: f32 = 250.0;
-pub const GEOTHERMAL_BASE_RADIUS: f32 = 100.0;
-pub const GEOTHERMAL_POSITION: Vec3 = Vec3::new(200.0, 0.0, 200.0);
+pub const GEOTHERMAL_BASE_HEIGHT: f32 = 500.0;
+pub const GEOTHERMAL_BASE_RADIUS: f32 = 200.0;
+pub const GEOTHERMAL_POSITION: Vec3 = Vec3::new(-400.0, 0.0, -400.0);
 
-pub const RADIO_TOWER_HEIGHT: f32 = 400.0;
-pub const RADIO_TOWER_WIDTH: f32 = 25.0;
-pub const RADIO_TOWER_POSITION: Vec3 = Vec3::new(200.0, 200.0, 200.0);
+pub const RADIO_TOWER_HEIGHT: f32 = 800.0;
+pub const RADIO_TOWER_WIDTH: f32 = 50.0;
+pub const RADIO_TOWER_POSITION: Vec3 = Vec3::new(-400.0, 400.0, -400.0);
 
-pub const BRIDGE_LENGTH: f32 = 300.0;
-pub const BRIDGE_HEIGHT: f32 = 10.0;
-pub const BRIDGE_WIDTH: f32 = 20.0;
-pub const BRIDGE_POSITION: Vec3 = Vec3::new(100.0, 394.99, 100.0);
+pub const BRIDGE_LENGTH: f32 = 600.0;
+pub const BRIDGE_HEIGHT: f32 = 20.0;
+pub const BRIDGE_WIDTH: f32 = 40.0;
+pub const BRIDGE_POSITION: Vec3 = Vec3::new(-200.0, 789.98, -200.0);
 
 pub fn spawn_geothermal(
     commands: &mut Commands,
@@ -20,10 +20,11 @@ pub fn spawn_geothermal(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     asset_server: &Res<AssetServer>,
 ) {
-    // Geothermal station base
+    // Geothermal station base with high friction
     commands.spawn((
         RigidBody::Static,
         Collider::capsule(GEOTHERMAL_BASE_RADIUS, GEOTHERMAL_BASE_HEIGHT),
+        Friction::new(10.0),
         PbrBundle {
             mesh: meshes.add(Capsule3d {
                 radius: GEOTHERMAL_BASE_RADIUS,
@@ -41,10 +42,11 @@ pub fn spawn_geothermal(
         Name::new("GeothermalBase"),
     ));
 
-    // Radio tower
+    // Radio tower with high friction
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(RADIO_TOWER_WIDTH, RADIO_TOWER_HEIGHT, RADIO_TOWER_WIDTH),
+        Friction::new(10.0),
         PbrBundle {
             mesh: meshes.add(Cuboid::new(RADIO_TOWER_WIDTH, RADIO_TOWER_HEIGHT, RADIO_TOWER_WIDTH)),
             material: materials.add(StandardMaterial {
@@ -59,10 +61,11 @@ pub fn spawn_geothermal(
         Name::new("RadioTower"),
     ));
 
-    // Concrete bridge connecting platform to main area
+    // Bridge with high friction
     commands.spawn((
         RigidBody::Static,
         Collider::cuboid(BRIDGE_LENGTH, BRIDGE_HEIGHT, BRIDGE_WIDTH),
+        Friction::new(10.0),
         PbrBundle {
             mesh: meshes.add(Cuboid::new(BRIDGE_LENGTH, BRIDGE_HEIGHT, BRIDGE_WIDTH)),
             material: materials.add(StandardMaterial {

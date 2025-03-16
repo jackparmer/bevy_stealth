@@ -24,18 +24,21 @@ use systems::player::climbing::{
     handle_ladder_top,
 };
 use systems::player::swimming::swimming_system;
-use systems::player::driving::{toggle_driving, driving_control};
+use systems::player::driving::{toggle_driving, driving_control };
 use systems::player::teleports::teleport_system;
 use systems::player::falling;
 use systems::player::dirigible::{toggle_dirigible, dirigible_control, animate_floating_balloon};
 
+use systems::environments::acquifier::check_acquifier_dirigible_trigger;
 use systems::environments::portal::portal_system;
 use systems::environments::terrain::{spawn_terrain, toggle_terrain_texture};
 use systems::environments::airlock::{spawn_airlock, handle_airlock_teleport, blink_airlock_light};
 use systems::environments::searchlight::{underwater_searchlight_system, update_searchlight_rotation};
-use systems::environments::maze::{spawn_maze, check_dirigible_trigger};
+use systems::environments::maze::{spawn_maze, check_dirigible_trigger, check_tank_exit};
 use systems::environments::ice_cave::{update_ice_particles, handle_ice_cave_interactions};
-use systems::environments::garage::{spawn_garage, handle_tank_interaction, handle_garage_approach};
+use systems::environments::garage::{spawn_garages, handle_tank_interaction, handle_garage_approach};
+use systems::environments::big_pipe::{spawn_big_pipe, handle_pipe_lift};
+use systems::environments::lanterns::{spawn_lanterns, update_lanterns};
 
 use systems::core::sentry::{
     spawn_sentry,
@@ -70,16 +73,19 @@ fn main() {
             setup,
             setup_explosion_materials,
             spawn_sentry,
-            spawn_garage,
+            spawn_garages,
+            spawn_big_pipe,
         ).chain())
         .add_systems(Startup, spawn_maze)
         .add_systems(Startup, spawn_terrain)
         .add_systems(Startup, spawn_airlock)
         .add_systems(Update, handle_airlock_teleport)
+        .add_systems(Update, check_acquifier_dirigible_trigger)
         .add_systems(Update, blink_airlock_light)
         .add_systems(Update, toggle_terrain_texture)
         .add_systems(Update, toggle_driving)
         .add_systems(Update, driving_control)
+        .add_systems(Update, check_tank_exit)
         .add_systems(Update, toggle_dirigible)
         .add_systems(Update, dirigible_control)
         .add_systems(Update, animate_floating_balloon)
@@ -121,6 +127,9 @@ fn main() {
         .add_systems(Update, handle_tank_interaction)
         .add_systems(Update, handle_garage_approach)
         .add_systems(Update, check_dirigible_trigger)
+        .add_systems(Update, handle_pipe_lift)
+        .add_systems(Startup, spawn_lanterns)
+        .add_systems(Update, update_lanterns)
         .run();
 }
 

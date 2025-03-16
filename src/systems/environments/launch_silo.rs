@@ -2,12 +2,12 @@ use bevy::prelude::*;
 use avian3d::prelude::*;
 
 // Constants for structure dimensions
-pub const WALL_HEIGHT: f32 = 400.0;
+pub const WALL_HEIGHT: f32 = 800.0;
 pub const WALL_Y_POSITION: f32 = WALL_HEIGHT/2.0;
-const WALL_NORTH_POSITION: Vec3 = Vec3::new(0.0, WALL_Y_POSITION, -50.0);
-const WALL_SOUTH_POSITION: Vec3 = Vec3::new(0.0, WALL_Y_POSITION, 50.0);
-const WALL_EAST_POSITION: Vec3 = Vec3::new(40.0, WALL_Y_POSITION, 0.0);
-const WALL_WEST_POSITION: Vec3 = Vec3::new(-40.0, WALL_Y_POSITION, 0.0);
+const WALL_NORTH_POSITION: Vec3 = Vec3::new(0.0, WALL_Y_POSITION, -150.0);
+const WALL_SOUTH_POSITION: Vec3 = Vec3::new(0.0, WALL_Y_POSITION, 150.0);
+const WALL_EAST_POSITION: Vec3 = Vec3::new(120.0, WALL_Y_POSITION, 0.0);
+const WALL_WEST_POSITION: Vec3 = Vec3::new(-120.0, WALL_Y_POSITION, 0.0);
 
 pub fn spawn_launch_silo(
     commands: &mut Commands,
@@ -15,12 +15,13 @@ pub fn spawn_launch_silo(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     asset_server: &Res<AssetServer>,
 ) {
-    // North wall
+    // North wall with high friction
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(100.0, WALL_HEIGHT, 20.0),
+        Collider::cuboid(300.0, WALL_HEIGHT, 60.0),
+        Friction::new(10.0),  // Add high friction
         PbrBundle {
-            mesh: meshes.add(Cuboid::new(100.0, WALL_HEIGHT, 20.0)),
+            mesh: meshes.add(Cuboid::new(300.0, WALL_HEIGHT, 60.0)),
             material: materials.add(StandardMaterial {
                 base_color_texture: Some(asset_server.load("textures/concrete.png")),
                 metallic: 1.0,
@@ -31,12 +32,13 @@ pub fn spawn_launch_silo(
         },
     ));
 
-    // South wall 
+    // South wall with high friction
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(100.0, WALL_HEIGHT, 20.0),
+        Collider::cuboid(300.0, WALL_HEIGHT, 60.0),
+        Friction::new(10.0),  // Add high friction
         PbrBundle {
-            mesh: meshes.add(Cuboid::new(100.0, WALL_HEIGHT, 20.0)),
+            mesh: meshes.add(Cuboid::new(300.0, WALL_HEIGHT, 60.0)),
             material: materials.add(StandardMaterial {
                 base_color_texture: Some(asset_server.load("textures/concrete.png")),
                 metallic: 1.0,
@@ -47,12 +49,13 @@ pub fn spawn_launch_silo(
         },
     ));
 
-    // East wall
+    // East wall with high friction
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(20.0, WALL_HEIGHT, 80.0),
+        Collider::cuboid(60.0, WALL_HEIGHT, 240.0),
+        Friction::new(10.0),  // Add high friction
         PbrBundle {
-            mesh: meshes.add(Cuboid::new(20.0, WALL_HEIGHT, 80.0)),
+            mesh: meshes.add(Cuboid::new(60.0, WALL_HEIGHT, 240.0)),
             material: materials.add(StandardMaterial {
                 base_color_texture: Some(asset_server.load("textures/concrete.png")),
                 metallic: 1.0,
@@ -63,12 +66,13 @@ pub fn spawn_launch_silo(
         },
     ));
 
-    // West wall
+    // West wall with high friction
     commands.spawn((
         RigidBody::Static,
-        Collider::cuboid(20.0, WALL_HEIGHT, 80.0),
+        Collider::cuboid(60.0, WALL_HEIGHT, 240.0),
+        Friction::new(10.0),  // Add high friction
         PbrBundle {
-            mesh: meshes.add(Cuboid::new(20.0, WALL_HEIGHT, 80.0)),
+            mesh: meshes.add(Cuboid::new(60.0, WALL_HEIGHT, 240.0)),
             material: materials.add(StandardMaterial {
                 base_color_texture: Some(asset_server.load("textures/concrete.png")),
                 metallic: 1.0,

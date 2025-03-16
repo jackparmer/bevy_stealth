@@ -193,9 +193,9 @@ pub fn handle_airlock_teleport(
                 if trigger.cooldown.finished() {
                     // Display appropriate message based on entry/exit
                     if trigger.is_entry {
-                        display_message("ENTERING AIRLOCK", Color::WHITE, &mut message_display);
+                        display_message("Shelter in the vehicle", Color::WHITE, &mut message_display);
                     } else {
-                        display_message("FIND THE GARAGE", Color::WHITE, &mut message_display);
+                        display_message("Shelter in the vehicle", Color::WHITE, &mut message_display);
                     }
                     
                     // Small delay to allow message to be visible

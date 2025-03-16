@@ -8,6 +8,11 @@ use bevy::{
 use crate::components::Protagonist;
 use crate::resources::{ProtagonistAnimations, PROTAGONIST_ANIMATIONS};
 
+// Add climbing speed constants
+const BASE_CLIMB_SPEED: f32 = 4.0;
+const CLIMB_VELOCITY_MULTIPLIER: f32 = 5.0;
+const FAST_CLIMB_MULTIPLIER: f32 = 4.0;
+
 pub fn handle_climbing(
     mut collision_started: EventReader<CollisionStarted>,
     mut collision_ended: EventReader<CollisionEnded>,
@@ -63,9 +68,10 @@ pub fn climbing_keyboard_control(
     mut velocity_query: Query<(&mut LinearVelocity, &mut AngularVelocity), With<Protagonist>>,
     mut animation_players: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
     mut camera_query: Query<&mut Transform, (With<Camera>, Without<Protagonist>)>,
-    mut spotlight_query: Query<&mut Transform, (With<SpotLight>, Without<Camera>, Without<Protagonist>)>,
+    mut spotlight_query: Query<(Entity, &mut Transform), (With<SpotLight>, Without<Camera>, Without<Protagonist>)>,
     animations: Res<ProtagonistAnimations>,
     time: Res<Time>,
+    mut commands: Commands,
 ) {
     let (protagonist_transform, mut protagonist) = match protagonist_query.get_single_mut() {
         Ok(p) => p,
@@ -73,15 +79,36 @@ pub fn climbing_keyboard_control(
     };
 
     // Update spotlight position when climbing
-    if let Ok(mut spotlight_transform) = spotlight_query.get_single_mut() {
+    if let Ok((spotlight_entity, mut spotlight_transform)) = spotlight_query.get_single_mut() {
         if protagonist.is_climbing {
-            // Position light behind and slightly above player when climbing
-            spotlight_transform.translation = protagonist_transform.translation + Vec3::new(0.0, 2.0, 4.0);
+            // Match camera position (0.0, 2.0, 30.0) relative to player
+            spotlight_transform.translation = protagonist_transform.translation + Vec3::new(0.0, 2.0, 30.0);
             spotlight_transform.look_at(protagonist_transform.translation, Vec3::Y);
+            
+            // Make spotlight much brighter when climbing
+            commands.entity(spotlight_entity).insert(SpotLight {
+                intensity: 50000000000000000.0, // 10000x brighter
+                color: Color::srgb(0.99, 0.95, 0.9),
+                outer_angle: 0.5,
+                inner_angle: 0.2,
+                shadows_enabled: true,
+                range: 500.0,
+                ..default()
+            });
         } else {
-            // Reset to original position when not climbing
+            // Reset to original position and brightness when not climbing
             spotlight_transform.translation = Vec3::new(0.0, 15.0, 2.0);
             spotlight_transform.look_at(Vec3::new(0.0, 0.0, -10.0), Vec3::Y);
+            
+            commands.entity(spotlight_entity).insert(SpotLight {
+                intensity: 5000000.0,
+                color: Color::srgb(1.0, 0.95, 0.9),
+                outer_angle: 0.5,
+                inner_angle: 0.2,
+                shadows_enabled: true,
+                range: 50.0,
+                ..default()
+            });
         }
     }
 
@@ -97,11 +124,11 @@ pub fn climbing_keyboard_control(
 
         // Add speed multiplier based on shift key
         let speed_multiplier = if keyboard_input.pressed(KeyCode::ShiftLeft) || 
-                                keyboard_input.pressed(KeyCode::ShiftRight) { 2.0 } else { 1.0 };
+                                keyboard_input.pressed(KeyCode::ShiftRight) { FAST_CLIMB_MULTIPLIER } else { 1.0 };
 
         // Calculate movement speeds with multiplier
-        let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { 2.0 * speed_multiplier } 
-                        else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 * speed_multiplier }
+        let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { BASE_CLIMB_SPEED * speed_multiplier } 
+                        else if keyboard_input.pressed(KeyCode::KeyS) { -BASE_CLIMB_SPEED * speed_multiplier }
                         else { 0.0 };
         
         let side_speed = if keyboard_input.pressed(KeyCode::KeyQ) { 2.0 * speed_multiplier }
@@ -110,14 +137,14 @@ pub fn climbing_keyboard_control(
 
         // Update velocity with multiplied speeds
         for (mut linear_velocity, mut angular_velocity) in velocity_query.iter_mut() {
-            linear_velocity.0 = Vec3::new(0.0, climb_speed * 2.5, side_speed * 2.5);
+            linear_velocity.0 = Vec3::new(0.0, climb_speed * CLIMB_VELOCITY_MULTIPLIER, side_speed * CLIMB_VELOCITY_MULTIPLIER);
             angular_velocity.0 = Vec3::ZERO;
         }
 
         for (mut player, mut transitions) in &mut animation_players {
             if protagonist.is_climbing {
-                let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { 2.0 * speed_multiplier } 
-                                else if keyboard_input.pressed(KeyCode::KeyS) { -2.0 * speed_multiplier }
+                let climb_speed = if keyboard_input.pressed(KeyCode::KeyW) { BASE_CLIMB_SPEED * speed_multiplier } 
+                                else if keyboard_input.pressed(KeyCode::KeyS) { -BASE_CLIMB_SPEED * speed_multiplier }
                                 else { 0.0 };
                 
                 if let Some(climb) = PROTAGONIST_ANIMATIONS.get("CLIMB") {

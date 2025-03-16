@@ -1,12 +1,13 @@
 use crate::components::Protagonist;
 use crate::resources::ProtagonistAnimations;
-use crate::systems::environments::ladder::{spawn_ladder, LadderConfig};
 use crate::systems::environments::ice_cave::spawn_ice_cave;
 use crate::systems::environments::launch_silo::spawn_launch_silo;
 use crate::systems::environments::reactor::spawn_reactor;
+use crate::systems::environments::geothermal::spawn_geothermal;
 use crate::systems::environments::glaciers::spawn_glaciers;
 use crate::components::Sentry;
 use crate::systems::core::sentry::SentryTiming;
+use crate::systems::environments::acquifier::spawn_acquifier;
 
 use avian3d::prelude::*;
 use bevy::{
@@ -20,7 +21,7 @@ use bevy::render::view::RenderLayers;
 
 // Constants for structure dimensions
 
-pub const WORLD_RADIUS: f32 = 10000.0;
+pub const WORLD_RADIUS: f32 = 15000.0;
 pub const PERIMETER_WALL_HEIGHT: f32 = 5000.0;
 pub const ACQUIFIER_FLOOR_DEPTH: f32 = -1000.0;
 
@@ -31,14 +32,6 @@ pub struct ProtagonistStart {
 pub const PROTAGONIST_START: ProtagonistStart = ProtagonistStart {
     position: Vec3::new(204.0, 3.0, -35.0),
 };
-
-#[derive(Component)]
-pub struct TramCar {
-    pub origin: Vec3,
-    pub time: f32,
-    pub amplitude: f32,
-    pub frequency: f32,
-}
 
 pub fn setup(
     mut commands: Commands, 
@@ -185,6 +178,8 @@ pub fn setup(
     // Replace the glacier generation code with:
     spawn_glaciers(&mut commands, &asset_server);
 
+    spawn_geothermal(&mut commands, &mut meshes, &mut materials, &asset_server);
+
     // Replace the wall spawning code with:
     spawn_launch_silo(&mut commands, &mut meshes, &mut materials, &asset_server);
 
@@ -271,12 +266,23 @@ pub fn setup(
                 half_height: 2.5,
             }),
             material: materials.add(StandardMaterial {
-                base_color_texture: Some(asset_server.load("textures/nasa_arctic.png")),
+                base_color_texture: Some({
+                    let texture_handle = asset_server.load("textures/nasa_arctic.png");
+                    if let Some(image) = images.get_mut(&texture_handle) {
+                        image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
+                            address_mode_u: ImageAddressMode::Repeat,
+                            address_mode_v: ImageAddressMode::Repeat,
+                            address_mode_w: ImageAddressMode::Repeat,
+                            ..default()
+                        });
+                    }
+                    texture_handle
+                }),
                 perceptual_roughness: 0.2,
                 metallic: 0.6,
                 ..default()
             }),
-            transform: Transform::from_xyz(0.0,0.0, 0.0), 
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
             ..default()
         },
         RenderLayers::from_layers(&[0, 1]),
@@ -383,4 +389,7 @@ pub fn setup(
             ..default()
         });
     });
+
+    // Replace aquifer and perimeter wall spawning with:
+    spawn_acquifier(&mut commands, &mut meshes, &mut materials, &asset_server);
 }

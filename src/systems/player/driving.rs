@@ -13,6 +13,10 @@ pub fn set_driving_state(
 ) {
     protagonist.is_driving = new_state;
     *scene = if new_state {
+        commands.entity(protagonist_entity)
+            .insert(Collider::cuboid(2.5, 1.5, 3.0))
+            .insert(GravityScale(5.0));
+
         if let Ok(children) = children_query.get(protagonist_entity) {
             if let Some(spotlight_entity) = children.first() {
                 commands.entity(*spotlight_entity).insert(SpotLight {
@@ -20,7 +24,7 @@ pub fn set_driving_state(
                     color: Color::srgb(1.0, 0.2, 0.2),
                     outer_angle: 0.6,
                     inner_angle: 0.3,
-                    shadows_enabled: true,
+                    shadows_enabled: false,
                     range: 100.0,
                     ..default()
                 });
@@ -30,6 +34,11 @@ pub fn set_driving_state(
         }
         asset_server.load("models/tank.glb#Scene0")
     } else {
+        // Reset to original protagonist collider
+        commands.entity(protagonist_entity)
+            .insert(Collider::cuboid(1.0, 0.25, 1.0))
+            .insert(GravityScale(3.0));
+
         if let Ok(children) = children_query.get(protagonist_entity) {
             if let Some(spotlight_entity) = children.first() {
                 commands.entity(*spotlight_entity).insert(SpotLight {
@@ -51,15 +60,23 @@ pub fn set_driving_state(
 
 pub fn toggle_driving(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(Entity, &mut Protagonist, &mut Handle<Scene>)>,
+    mut query: Query<(Entity, &Transform, &mut Protagonist, &mut Handle<Scene>)>,
     children_query: Query<&Children>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyT) {
-        for (entity, mut protagonist, mut scene) in query.iter_mut() {
+        for (entity, transform, mut protagonist, mut scene) in query.iter_mut() {
             let new_state = !protagonist.is_driving;
-            set_driving_state(&mut protagonist, &mut scene, &asset_server, new_state, &mut commands, entity, &children_query);
+            set_driving_state(
+                &mut protagonist,
+                &mut scene,
+                &asset_server,
+                new_state,
+                &mut commands,
+                entity,
+                &children_query,
+            );
         }
     }
 }
@@ -69,7 +86,6 @@ pub fn driving_control(
     mut protagonist_query: Query<(Entity, &mut Transform, &Protagonist)>,
     mut velocity_query: Query<&mut LinearVelocity, With<Protagonist>>,
     mut angular_velocity_query: Query<&mut AngularVelocity, With<Protagonist>>,
-    spatial_query: SpatialQuery,
     time: Res<Time>,
 ) {
     // Base driving parameters
@@ -81,73 +97,18 @@ pub fn driving_control(
     const DRIFT_FACTOR: f32 = 0.92;
     const TURN_SENSITIVITY: f32 = 2.5;
     const SPEED_TURN_FACTOR: f32 = 0.4;
-    const MIN_DRIVING_HEIGHT: f32 = 10.0;  // New constant for minimum height
-
-    // Ground detection parameters
-    const GROUND_CHECK_HEIGHT: f32 = 5.0;
-    const GROUND_CHECK_DISTANCE: f32 = 100.0;
-    const GROUND_SNAP_SPEED: f32 = 0.1;
-    const SUSPENSION_HEIGHT: f32 = -2.0;
+    const FIXED_HEIGHT: f32 = 4.0;  // Fixed height for the tank
 
     if let Ok((protagonist_entity, mut protagonist_transform, protagonist)) = protagonist_query.get_single_mut() {
         if !protagonist.is_driving {
             return;
         }
 
-        // Ensure tank stays above minimum height
-        if protagonist_transform.translation.y < MIN_DRIVING_HEIGHT {
-            protagonist_transform.translation.y = MIN_DRIVING_HEIGHT;
-            if let Ok(mut velocity) = velocity_query.get_single_mut() {
-                velocity.0.y = 0.0;
-            }
-        }
-
-        // Multiple ground check points using raycasts
-        let ray_positions = [
-            protagonist_transform.translation + Vec3::new(3.0, GROUND_CHECK_HEIGHT, 3.0),   // Front right
-            protagonist_transform.translation + Vec3::new(-3.0, GROUND_CHECK_HEIGHT, 3.0),  // Front left
-            protagonist_transform.translation + Vec3::new(3.0, GROUND_CHECK_HEIGHT, -3.0),  // Back right
-            protagonist_transform.translation + Vec3::new(-3.0, GROUND_CHECK_HEIGHT, -3.0), // Back left
-            protagonist_transform.translation + Vec3::new(0.0, GROUND_CHECK_HEIGHT, 0.0),   // Center
-        ];
-
-        let ray_dir = Dir3::NEG_Y;
-        let filter = SpatialQueryFilter::from_excluded_entities([protagonist_entity]);
+        // Keep tank at fixed height
+        protagonist_transform.translation.y = FIXED_HEIGHT;
         
-        let mut ground_height = f32::NEG_INFINITY;
-        let mut is_grounded = false;
-
-        // Check all ray positions and find the highest ground point
-        for ray_pos in ray_positions.iter() {
-            if let Some(hit) = spatial_query.ray_hits(
-                *ray_pos, 
-                ray_dir, 
-                GROUND_CHECK_DISTANCE,
-                1,
-                true,
-                filter.clone()
-            ).first() {
-                is_grounded = true;
-                let hit_height = ray_pos.y - hit.time_of_impact + SUSPENSION_HEIGHT;
-                ground_height = ground_height.max(hit_height);
-            }
-        }
-
         let mut current_velocity = velocity_query.single_mut();
-
-        // Ground adhesion and suspension logic
-        if is_grounded {
-            let target_height = ground_height + SUSPENSION_HEIGHT;  // Add suspension height to target
-            protagonist_transform.translation.y = protagonist_transform.translation.y.lerp(
-                target_height,
-                GROUND_SNAP_SPEED
-            );
-            current_velocity.0.y = 0.0;
-        } else {
-            // Apply gravity when not grounded
-            current_velocity.0.y = (current_velocity.0.y - 9.81 * time.delta_seconds())
-                .max(-20.0);  // Terminal velocity
-        }
+        current_velocity.0.y = 0.0;  // No vertical movement
 
         // Extract only Y rotation and force upright orientation
         let (yaw, _, _) = protagonist_transform.rotation.to_euler(EulerRot::YXZ);

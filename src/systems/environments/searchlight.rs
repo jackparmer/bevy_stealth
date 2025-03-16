@@ -27,17 +27,21 @@ pub fn update_searchlight_rotation(
 pub fn underwater_searchlight_system(
     mut commands: Commands,
     query: Query<&Protagonist>,
-    light_query: Query<Entity, With<UnderwaterSearchlight>>,
+    mut light_query: Query<(&mut DirectionalLight, Entity), With<UnderwaterSearchlight>>,
 ) {
     let is_swimming = query.single().is_swimming;
     let has_light = !light_query.is_empty();
 
     match (is_swimming, has_light) {
-        (true, false) => {
+        (_, false) => {
             commands.spawn((
                 DirectionalLightBundle {
                     directional_light: DirectionalLight {
-                        color: Color::srgb(0.24, 0.62, 0.92),
+                        color: if is_swimming {
+                            Color::srgb(0.24, 0.62, 0.92) // Blue underwater color
+                        } else {
+                            Color::srgb(0.6, 0.3, 0.3) // Softer reddish color
+                        },
                         illuminance: 2500.0,
                         shadows_enabled: true,
                         ..default()
@@ -51,11 +55,14 @@ pub fn underwater_searchlight_system(
                 },
             ));
         }
-        (false, true) => {
-            for entity in light_query.iter() {
-                commands.entity(entity).despawn_recursive();
+        (is_swimming, true) => {
+            for (mut light, _) in light_query.iter_mut() {
+                light.color = if is_swimming {
+                    Color::srgb(0.24, 0.62, 0.92) // Blue underwater color
+                } else {
+                    Color::srgb(0.6, 0.3, 0.3) // Softer reddish color
+                };
             }
         }
-        _ => {}
     }
 }

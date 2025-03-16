@@ -10,3 +10,6 @@ pub mod maze;
 pub mod garage;
 pub mod glaciers;
 pub mod geothermal;
+pub mod acquifier;
+pub mod big_pipe;
+pub mod lanterns;

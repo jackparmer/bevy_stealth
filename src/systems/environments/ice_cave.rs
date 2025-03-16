@@ -7,9 +7,9 @@ use crate::systems::player::driving::set_driving_state;
 use crate::systems::core::screenplay::{MessageDisplay, display_message};
 
 // Cave dimensions
-const CAVE_POSITION_X: f32 = 1194.7814;
+const CAVE_POSITION_X: f32 = 2394.7814;
 const CAVE_POSITION_Y: f32 = 3.797667;
-const CAVE_POSITION_Z: f32 = -4356.0886;
+const CAVE_POSITION_Z: f32 = -4712.0886;
 const CAVE_RADIUS: f32 = 600.0;
 const CAVE_WALL_THICKNESS: f32 = 200.0;
 const CAVE_HEIGHT: f32 = 2400.0;
@@ -212,24 +212,6 @@ pub fn spawn_ice_cave(
             },
         ));
     }
-
-    // Add transportation disc
-    let disc_material = materials.add(StandardMaterial {
-        base_color: Color::srgba(0.2, 0.4, 0.99, 0.8),
-        emissive: Color::srgb(0.0, 0.2, 0.99).into(),
-        alpha_mode: AlphaMode::Blend,
-        metallic: 0.8,
-        perceptual_roughness: 0.1,
-        ..default()
-    });
-
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Circle::new(50.0)),  // 50.0 radius disc
-        material: disc_material,
-        transform: Transform::from_translation(position + Vec3::new(0.0, 1.0, 0.0))  // Slightly above ground
-            .with_rotation(Quat::from_rotation_x(-PI / 2.0)),  // Lay flat
-        ..default()
-    });
 }
 
 // Add this component
@@ -334,7 +316,7 @@ pub fn handle_ice_cave_interactions(
 ) {
     let cave_pos = Vec3::new(CAVE_POSITION_X, CAVE_POSITION_Y, CAVE_POSITION_Z);
     
-    // Get particle positions first
+    // Get particle positions and protagonist transform first
     let particle_positions: Vec<Vec3> = query_set.p1()
         .iter()
         .map(|transform| transform.translation)
@@ -342,13 +324,11 @@ pub fn handle_ice_cave_interactions(
 
     // Then handle protagonist
     if let Ok((entity, mut transform, mut protagonist, mut scene)) = query_set.p0().get_single_mut() {
-        // Check if inside cave (using horizontal distance)
         let horizontal_distance = Vec2::new(
             transform.translation.x - cave_pos.x,
             transform.translation.z - cave_pos.z
         ).length();
         
-        // Check if within cave bounds (both radius and height)
         let vertical_distance = (transform.translation.y - cave_pos.y).abs();
         if horizontal_distance < CAVE_RADIUS && vertical_distance < CAVE_HEIGHT / 2.0 {
             if protagonist.is_driving {
@@ -359,7 +339,7 @@ pub fn handle_ice_cave_interactions(
                     false,
                     &mut commands,
                     entity,
-                    &children_query
+                    &children_query,
                 );
                 display_message("FIND THE ACQUIFIER", Color::srgb(0.0, 0.2, 1.0), &mut message_display);
             }
@@ -370,8 +350,28 @@ pub fn handle_ice_cave_interactions(
             let distance = transform.translation.distance(particle_pos);
             if distance < 5.0 {
                 transform.translation.y -= 30.0;
+                display_message("Find the Reactor and plant a charge (C key)", Color::rgb(1.0, 0.5, 0.0), &mut message_display);
                 break;
             }
         }
+    }
+}
+
+pub fn check_tank_exit(
+    mut protagonist_query: Query<(Entity, &mut Protagonist, &mut Handle<Scene>)>,
+    mut commands: Commands,
+    children_query: Query<&Children>,
+    asset_server: Res<AssetServer>,
+) {
+    if let Ok((entity, mut protagonist, mut scene)) = protagonist_query.get_single_mut() {
+        set_driving_state(
+            &mut protagonist,
+            &mut scene,
+            &asset_server,
+            false,
+            &mut commands,
+            entity,
+            &children_query,
+        );
     }
 }

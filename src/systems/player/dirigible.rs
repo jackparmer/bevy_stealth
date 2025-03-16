@@ -2,6 +2,22 @@ use bevy::prelude::*;
 use avian3d::prelude::*;
 use crate::components::Protagonist;
 
+// Movement constants
+pub const DIRIGIBLE_VERTICAL_SPEED: f32 = 100.0;
+pub const DIRIGIBLE_FORWARD_SPEED: f32 = 450.0;
+pub const DIRIGIBLE_TURN_SPEED: f32 = 0.6;
+pub const DIRIGIBLE_ACCELERATION: f32 = 75.0;
+pub const DIRIGIBLE_DECELERATION: f32 = 8.0;
+pub const DIRIGIBLE_DAMPENING: f32 = 0.1;
+
+// Movement limits
+pub const DIRIGIBLE_MAX_HORIZONTAL_SPEED: f32 = 500.0;
+pub const DIRIGIBLE_MAX_VERTICAL_SPEED: f32 = 100.0;
+
+// Animation constants
+pub const DIRIGIBLE_SWAY_AMPLITUDE: f32 = 0.1;
+pub const DIRIGIBLE_SWAY_FREQUENCY: f32 = 0.2;
+
 // Make the marker component public
 #[derive(Component)]
 pub struct DirigibleBalloon;
@@ -58,7 +74,7 @@ pub fn toggle_dirigible(
                 commands.entity(entity).with_children(|parent| {
                     parent.spawn((
                         PbrBundle {
-                            mesh: meshes.add(Mesh::from(Sphere::new(2.0))),
+                            mesh: meshes.add(Mesh::from(Sphere::new(10.0))),
                             material: materials.add(StandardMaterial {
                                 base_color: Color::srgb(1.0, 1.0, 1.0),
                                 base_color_texture: Some(asset_server.load("textures/american-flag-background.png")),
@@ -67,7 +83,7 @@ pub fn toggle_dirigible(
                                 reflectance: 0.7,
                                 ..default()
                             }),
-                            transform: Transform::from_xyz(0.0, 8.0, 0.0),
+                            transform: Transform::from_xyz(0.0, 15.0, 0.0),
                             ..default()
                         },
                         DirigibleBalloon,
@@ -104,15 +120,6 @@ pub fn dirigible_control(
     mut angular_velocity_query: Query<&mut AngularVelocity, With<Protagonist>>,
     time: Res<Time>,
 ) {
-    const VERTICAL_SPEED: f32 = 600.0;
-    const FORWARD_SPEED: f32 = 3000.0;
-    const TURN_SPEED: f32 = 1.2;
-    const ACCELERATION: f32 = 15.0;     // Reduced further for more stability
-    const DECELERATION: f32 = 8.0;      // Increased for better stopping
-    const SWAY_AMPLITUDE: f32 = 0.1;    // Reduced sway
-    const SWAY_FREQUENCY: f32 = 0.2;    // Slower sway
-    const DAMPENING: f32 = 0.95;        // New dampening factor
-
     if let Ok((mut transform, protagonist)) = protagonist_query.get_single_mut() {
         if !protagonist.is_dirigible {
             return;
@@ -121,27 +128,24 @@ pub fn dirigible_control(
         // Handle turning with A/D keys with smooth interpolation
         if let Ok(mut angular_velocity) = angular_velocity_query.get_single_mut() {
             let target_turn = if keyboard_input.pressed(KeyCode::KeyD) {
-                Vec3::new(0.0, -TURN_SPEED, 0.0)
+                Vec3::new(0.0, -DIRIGIBLE_TURN_SPEED, 0.0)
             } else if keyboard_input.pressed(KeyCode::KeyA) {
-                Vec3::new(0.0, TURN_SPEED, 0.0)
+                Vec3::new(0.0, DIRIGIBLE_TURN_SPEED, 0.0)
             } else {
                 Vec3::ZERO
             };
             
-            // Apply dampening to current angular velocity
-            angular_velocity.0 *= DAMPENING;
+            angular_velocity.0 *= DIRIGIBLE_DAMPENING;
             
-            // Smooth angular velocity changes
             angular_velocity.0 = Vec3::lerp(
                 angular_velocity.0,
                 target_turn,
-                ACCELERATION * time.delta_seconds()
+                DIRIGIBLE_ACCELERATION * time.delta_seconds()
             );
         }
 
-        // Add gentle sway with dampening
-        let sway = SWAY_AMPLITUDE * (time.elapsed_seconds() * SWAY_FREQUENCY).sin();
-        transform.rotate_local_z(sway * time.delta_seconds() * DAMPENING);
+        let sway = DIRIGIBLE_SWAY_AMPLITUDE * (time.elapsed_seconds() * DIRIGIBLE_SWAY_FREQUENCY).sin();
+        transform.rotate_local_z(sway * time.delta_seconds() * DIRIGIBLE_DAMPENING);
 
         // Position clamping
         let pos = transform.translation;
@@ -155,44 +159,40 @@ pub fn dirigible_control(
         let dt = time.delta_seconds();
         let mut movement = Vec3::ZERO;
 
-        // Vertical movement
         if keyboard_input.pressed(KeyCode::ShiftLeft) {
-            movement.y += VERTICAL_SPEED;
+            movement.y += DIRIGIBLE_VERTICAL_SPEED;
         }
         if keyboard_input.pressed(KeyCode::Space) {
-            movement.y -= VERTICAL_SPEED;
+            movement.y -= DIRIGIBLE_VERTICAL_SPEED;
         }
 
-        // Forward/Backward movement (corrected directions)
         if keyboard_input.pressed(KeyCode::KeyW) {
-            movement += transform.forward() * FORWARD_SPEED;
+            movement += transform.forward() * DIRIGIBLE_FORWARD_SPEED;
         }
         if keyboard_input.pressed(KeyCode::KeyS) {
-            movement -= transform.forward() * FORWARD_SPEED;
+            movement -= transform.forward() * DIRIGIBLE_FORWARD_SPEED;
         }
 
-        // Apply dampening to current velocity before adding new movement
-        velocity.0 *= DAMPENING;
+        velocity.0 *= DIRIGIBLE_DAMPENING;
 
         velocity.0 = if movement != Vec3::ZERO {
             Vec3::lerp(
                 velocity.0,
                 movement,
-                ACCELERATION * dt
+                DIRIGIBLE_ACCELERATION * dt
             )
         } else {
             Vec3::lerp(
                 velocity.0,
                 Vec3::ZERO,
-                DECELERATION * dt
+                DIRIGIBLE_DECELERATION * dt
             )
         };
 
-        // Tighter velocity clamping
         velocity.0 = Vec3::new(
-            velocity.0.x.clamp(-50.0, 50.0),
-            velocity.0.y.clamp(-30.0, 30.0),
-            velocity.0.z.clamp(-50.0, 50.0)
+            velocity.0.x.clamp(-DIRIGIBLE_MAX_HORIZONTAL_SPEED, DIRIGIBLE_MAX_HORIZONTAL_SPEED),
+            velocity.0.y.clamp(-DIRIGIBLE_MAX_VERTICAL_SPEED, DIRIGIBLE_MAX_VERTICAL_SPEED),
+            velocity.0.z.clamp(-DIRIGIBLE_MAX_HORIZONTAL_SPEED, DIRIGIBLE_MAX_HORIZONTAL_SPEED)
         );
     }
 }
