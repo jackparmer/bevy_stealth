@@ -112,24 +112,6 @@ pub fn spawn_terrain(
         }
     }
 
-    let heights = vertices.clone().iter()
-        .map(|v| v[1])
-        .collect::<Vec<f32>>()
-        .chunks(TERRAIN_RESOLUTION as usize + 1)
-        .step_by(5)  // Take every 5th row
-        .map(|chunk| {
-            chunk.iter()
-                .step_by(5)  // Take every 5th column
-                .take(200)   // Fixed width
-                .cloned()
-                .map(|h| if h == 0.0 { BASE_HEIGHT } else { h })  // Replace invalid points
-                .collect::<Vec<f32>>()
-        })
-        .take(200)   // Fixed height
-        .collect::<Vec<Vec<f32>>>();
-
-    let heights_width = heights[0].len();
-    let heights_height = heights.len();
 
     let mut mesh = Mesh::new(
         bevy::render::render_resource::PrimitiveTopology::TriangleList,
